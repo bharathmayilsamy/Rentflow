@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { TabKey, Property, Tenant, RentPayment, MaintenanceRequest, Expense, Reminder, Settings, TenantBill, PassbookEntry, User, AuthUser } from './types';
-import { initialProperties, initialTenants, initialPayments, initialMaintenanceRequests, initialExpenses, initialReminders, initialSettings, initialBills, initialPassbook, initialUsers } from './data';
+import { initialSettings } from './data';
 import { supabase, signOut, onAuthStateChange } from './lib/supabase';
 import { db_loadAllData, db_saveProperties, db_saveTenants, db_savePayments, db_saveMaintenance, db_saveExpenses, db_saveReminders, db_saveBills, db_savePassbook, db_saveUsers, db_saveSettings } from './lib/database';
 import Login from './components/Login';
@@ -57,30 +57,32 @@ function App() {
   const [expandedSections, setExpandedSections] = useState<string[]>(['money', 'people']);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const [properties, setProperties] = useState<Property[]>(initialProperties);
-  const [tenants, setTenants] = useState<Tenant[]>(initialTenants);
-  const [payments, setPayments] = useState<RentPayment[]>(initialPayments);
-  const [maintenance, setMaintenance] = useState<MaintenanceRequest[]>(initialMaintenanceRequests);
-  const [expenses, setExpenses] = useState<Expense[]>(initialExpenses);
-  const [reminders, setReminders] = useState<Reminder[]>(initialReminders);
+  // START WITH EMPTY DATA - only load from Supabase
+  const [properties, setProperties] = useState<Property[]>([]);
+  const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [payments, setPayments] = useState<RentPayment[]>([]);
+  const [maintenance, setMaintenance] = useState<MaintenanceRequest[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [reminders, setReminders] = useState<Reminder[]>([]);
   const [settings, setSettings] = useState<Settings>(initialSettings);
-  const [bills, setBills] = useState<TenantBill[]>(initialBills);
-  const [passbook, setPassbook] = useState<PassbookEntry[]>(initialPassbook);
-  const [users, setUsers] = useState<User[]>(initialUsers);
+  const [bills, setBills] = useState<TenantBill[]>([]);
+  const [passbook, setPassbook] = useState<PassbookEntry[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
 
   const [showAddTenant, setShowAddTenant] = useState(false);
   const [tenantFilter, setTenantFilter] = useState<'active' | 'old'>('active');
   const [dbReady, setDbReady] = useState(false);
+  const [dataLoaded, setDataLoaded] = useState(false);
 
-  // Debounce timer refs to avoid hammering the DB
+  // Debounce timer refs
   const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
-  const debouncedSave = useCallback((key: string, saveFn: () => Promise<void>, delay = 800) => {
+  const debouncedSave = useCallback((key: string, saveFn: () => Promise<void>, delay = 1000) => {
     if (saveTimers.current[key]) clearTimeout(saveTimers.current[key]);
     saveTimers.current[key] = setTimeout(() => { saveFn(); }, delay);
   }, []);
 
-  // ── Auth check on mount ──
+  // Auth check on mount
   useEffect(() => {
     const checkAuth = async () => {
       try {
@@ -111,58 +113,79 @@ function App() {
           role: session.user.user_metadata?.role || 'Owner',
         });
         setIsAuthenticated(true);
+        setDataLoaded(false); // Reset to load fresh data
       } else if (event === 'SIGNED_OUT') {
         setCurrentUser(null);
         setIsAuthenticated(false);
         setDbReady(false);
+        setDataLoaded(false);
+        // Clear all data on logout
+        setProperties([]);
+        setTenants([]);
+        setPayments([]);
+        setMaintenance([]);
+        setExpenses([]);
+        setReminders([]);
+        setBills([]);
+        setPassbook([]);
+        setUsers([]);
+        setSettings(initialSettings);
       }
     });
     return () => { subscription.unsubscribe(); };
   }, []);
 
-  // ── Load data from Supabase after login ──
+  // Load data from Supabase after login
   useEffect(() => {
-    if (!isAuthenticated || !currentUser) return;
+    if (!isAuthenticated || !currentUser || dataLoaded) return;
 
     const loadData = async () => {
       try {
+        console.log('Loading data from Supabase for user:', currentUser.id);
         const data = await db_loadAllData();
 
-        // Only use Supabase data if it exists (has rows), otherwise keep defaults
-        if (data.properties && data.properties.length > 0) setProperties(data.properties);
-        if (data.tenants && data.tenants.length > 0) setTenants(data.tenants);
-        if (data.payments && data.payments.length > 0) setPayments(data.payments);
-        if (data.maintenance && data.maintenance.length > 0) setMaintenance(data.maintenance);
-        if (data.expenses && data.expenses.length > 0) setExpenses(data.expenses);
-        if (data.reminders && data.reminders.length > 0) setReminders(data.reminders);
-        if (data.bills && data.bills.length > 0) setBills(data.bills);
-        if (data.passbook && data.passbook.length > 0) setPassbook(data.passbook);
-        if (data.users && data.users.length > 0) setUsers(data.users);
+        // Load whatever is in Supabase (could be empty, that's OK)
+        setProperties(data.properties || []);
+        setTenants(data.tenants || []);
+        setPayments(data.payments || []);
+        setMaintenance(data.maintenance || []);
+        setExpenses(data.expenses || []);
+        setReminders(data.reminders || []);
+        setBills(data.bills || []);
+        setPassbook(data.passbook || []);
+        setUsers(data.users || []);
         if (data.settings) setSettings(data.settings);
+
+        console.log('Data loaded:', {
+          properties: data.properties?.length || 0,
+          tenants: data.tenants?.length || 0,
+        });
       } catch (err) {
         console.error('Failed to load from Supabase:', err);
       } finally {
+        setDataLoaded(true);
         setDbReady(true);
       }
     };
     loadData();
-  }, [isAuthenticated, currentUser]);
+  }, [isAuthenticated, currentUser, dataLoaded]);
 
-  // ── Save to Supabase when data changes (only after initial load) ──
-  useEffect(() => { if (dbReady) debouncedSave('properties', () => db_saveProperties(properties)); }, [properties, dbReady, debouncedSave]);
-  useEffect(() => { if (dbReady) debouncedSave('tenants', () => db_saveTenants(tenants)); }, [tenants, dbReady, debouncedSave]);
-  useEffect(() => { if (dbReady) debouncedSave('payments', () => db_savePayments(payments)); }, [payments, dbReady, debouncedSave]);
-  useEffect(() => { if (dbReady) debouncedSave('maintenance', () => db_saveMaintenance(maintenance)); }, [maintenance, dbReady, debouncedSave]);
-  useEffect(() => { if (dbReady) debouncedSave('expenses', () => db_saveExpenses(expenses)); }, [expenses, dbReady, debouncedSave]);
-  useEffect(() => { if (dbReady) debouncedSave('reminders', () => db_saveReminders(reminders)); }, [reminders, dbReady, debouncedSave]);
-  useEffect(() => { if (dbReady) debouncedSave('bills', () => db_saveBills(bills)); }, [bills, dbReady, debouncedSave]);
-  useEffect(() => { if (dbReady) debouncedSave('passbook', () => db_savePassbook(passbook)); }, [passbook, dbReady, debouncedSave]);
-  useEffect(() => { if (dbReady) debouncedSave('users', () => db_saveUsers(users)); }, [users, dbReady, debouncedSave]);
-  useEffect(() => { if (dbReady) debouncedSave('settings', () => db_saveSettings(settings)); }, [settings, dbReady, debouncedSave]);
+  // Save to Supabase when data changes (only after initial load is complete)
+  useEffect(() => { if (dbReady && dataLoaded) debouncedSave('properties', () => db_saveProperties(properties)); }, [properties, dbReady, dataLoaded, debouncedSave]);
+  useEffect(() => { if (dbReady && dataLoaded) debouncedSave('tenants', () => db_saveTenants(tenants)); }, [tenants, dbReady, dataLoaded, debouncedSave]);
+  useEffect(() => { if (dbReady && dataLoaded) debouncedSave('payments', () => db_savePayments(payments)); }, [payments, dbReady, dataLoaded, debouncedSave]);
+  useEffect(() => { if (dbReady && dataLoaded) debouncedSave('maintenance', () => db_saveMaintenance(maintenance)); }, [maintenance, dbReady, dataLoaded, debouncedSave]);
+  useEffect(() => { if (dbReady && dataLoaded) debouncedSave('expenses', () => db_saveExpenses(expenses)); }, [expenses, dbReady, dataLoaded, debouncedSave]);
+  useEffect(() => { if (dbReady && dataLoaded) debouncedSave('reminders', () => db_saveReminders(reminders)); }, [reminders, dbReady, dataLoaded, debouncedSave]);
+  useEffect(() => { if (dbReady && dataLoaded) debouncedSave('bills', () => db_saveBills(bills)); }, [bills, dbReady, dataLoaded, debouncedSave]);
+  useEffect(() => { if (dbReady && dataLoaded) debouncedSave('passbook', () => db_savePassbook(passbook)); }, [passbook, dbReady, dataLoaded, debouncedSave]);
+  useEffect(() => { if (dbReady && dataLoaded) debouncedSave('users', () => db_saveUsers(users)); }, [users, dbReady, dataLoaded, debouncedSave]);
+  useEffect(() => { if (dbReady && dataLoaded) debouncedSave('settings', () => db_saveSettings(settings)); }, [settings, dbReady, dataLoaded, debouncedSave]);
 
   const handleLogin = (user: AuthUser) => {
     setCurrentUser(user);
     setIsAuthenticated(true);
+    setDataLoaded(false); // Trigger data load
   };
 
   const handleLogout = async () => {
@@ -170,7 +193,19 @@ function App() {
     setCurrentUser(null);
     setIsAuthenticated(false);
     setDbReady(false);
+    setDataLoaded(false);
     setActiveTab('dashboard');
+    // Clear all data
+    setProperties([]);
+    setTenants([]);
+    setPayments([]);
+    setMaintenance([]);
+    setExpenses([]);
+    setReminders([]);
+    setBills([]);
+    setPassbook([]);
+    setUsers([]);
+    setSettings(initialSettings);
   };
 
   const toggleSection = (key: string) => {
@@ -297,7 +332,7 @@ function App() {
                             <child.icon className={`w-4 h-4 ${childActive ? 'text-indigo-400' : ''}`} />
                             <span className="flex-1 text-left">{child.label}</span>
                             {child.key === 'dues' && pendingDuesCount > 0 && <span className="bg-red-500/20 text-red-400 text-[10px] font-bold min-w-[20px] h-5 px-1.5 rounded-full flex items-center justify-center">{pendingDuesCount}</span>}
-                            {child.key === 'tenant' && <span className="bg-green-500/20 text-green-400 text-[10px] font-bold min-w-[20px] h-5 px-1.5 rounded-full flex items-center justify-center">{activeTenantsCount}</span>}
+                            {child.key === 'tenant' && activeTenantsCount > 0 && <span className="bg-green-500/20 text-green-400 text-[10px] font-bold min-w-[20px] h-5 px-1.5 rounded-full flex items-center justify-center">{activeTenantsCount}</span>}
                             {child.key === 'old-tenants' && oldTenantsCount > 0 && <span className="bg-slate-500/20 text-slate-400 text-[10px] font-bold min-w-[20px] h-5 px-1.5 rounded-full flex items-center justify-center">{oldTenantsCount}</span>}
                           </button>
                         );
