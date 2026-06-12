@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { AuthUser } from '../types';
-import { signIn, signUp, signOut, checkUserApproved, supabase } from '../lib/supabase';
-import { db_createSignupRequest, db_loadSignupRequests, db_updateSignupRequest } from '../lib/database';
+import { signIn, signUp } from '../lib/supabase';
 import { Home, Mail, Lock, Eye, EyeOff, LogIn, UserPlus, ArrowLeft } from 'lucide-react';
 
 interface Props {
@@ -36,20 +35,11 @@ export default function Login({ onLogin }: Props) {
       }
 
       if (data.user) {
-        const approved = await checkUserApproved(data.user.email || email, data.user.id);
-        if (!approved) {
-          await signOut();
-          setError('Your account is pending owner approval. Please wait until the owner approves your access.');
-          setIsLoading(false);
-          return;
-        }
-
         onLogin({
           id: data.user.id,
           email: data.user.email || '',
           name: data.user.user_metadata?.name || email.split('@')[0],
-          role: data.user.user_metadata?.role === 'Owner' ? 'Owner' : (data.user.user_metadata?.role || 'Staff'),
-          approved: true,
+          role: data.user.user_metadata?.role || 'Owner',
         });
       }
     } catch (err: any) {
@@ -80,19 +70,7 @@ export default function Login({ onLogin }: Props) {
       }
 
       if (data.user) {
-        await db_createSignupRequest(email, name, data.user.id);
-
-        const existingRequests = await db_loadSignupRequests();
-        const isFirstUser = !existingRequests || existingRequests.filter(r => r.status === 'Approved').length === 0;
-
-        if (isFirstUser) {
-          await db_updateSignupRequest(data.user.id, 'Approved');
-          await supabase.auth.updateUser({ data: { role: 'Owner', approved: true } });
-          setSuccess('Welcome! You are the owner. Please check your email to verify, then login.');
-        } else {
-          setSuccess('Account request submitted. The owner will review and approve your access. You will receive access once approved.');
-        }
-
+        setSuccess('Account created! Please check your email to verify, then login.');
         setMode('login');
         setPassword('');
       }
@@ -102,14 +80,22 @@ export default function Login({ onLogin }: Props) {
     setIsLoading(false);
   };
 
+  const fillDemoCredentials = () => {
+    setEmail('demo@rentflow.com');
+    setPassword('demo123456');
+    setError('');
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-900 to-slate-900 flex items-center justify-center p-4">
+      {/* Background Pattern */}
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-indigo-500/20 rounded-full blur-3xl" />
         <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-purple-500/20 rounded-full blur-3xl" />
       </div>
 
       <div className="relative w-full max-w-md">
+        {/* Logo */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl shadow-lg shadow-indigo-500/30 mb-4">
             <Home className="w-8 h-8 text-white" />
@@ -118,6 +104,7 @@ export default function Login({ onLogin }: Props) {
           <p className="text-slate-400 mt-1">Property Management System</p>
         </div>
 
+        {/* Auth Card */}
         <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-white/10">
           {mode === 'login' ? (
             <>
@@ -193,10 +180,24 @@ export default function Login({ onLogin }: Props) {
               <div className="mt-6 text-center">
                 <p className="text-slate-400 text-sm">
                   Don't have an account?{' '}
-                  <button onClick={() => { setMode('signup'); setError(''); setSuccess(''); }} className="text-indigo-400 hover:text-indigo-300 font-medium">
-                    Request access
+                  <button onClick={() => setMode('signup')} className="text-indigo-400 hover:text-indigo-300 font-medium">
+                    Create one
                   </button>
                 </p>
+              </div>
+
+              {/* Demo Info */}
+              <div className="mt-6 pt-6 border-t border-white/10">
+                <p className="text-sm text-slate-400 text-center mb-3">First time? Create a new account above</p>
+                <p className="text-xs text-slate-500 text-center">
+                  Or use demo account: demo@rentflow.com / demo123456
+                </p>
+                <button
+                  onClick={fillDemoCredentials}
+                  className="w-full mt-3 p-3 bg-white/5 hover:bg-white/10 rounded-xl transition text-slate-300 text-sm font-medium"
+                >
+                  Fill Demo Credentials
+                </button>
               </div>
             </>
           ) : (
@@ -204,8 +205,8 @@ export default function Login({ onLogin }: Props) {
               <button onClick={() => setMode('login')} className="flex items-center gap-2 text-slate-400 hover:text-white transition mb-4">
                 <ArrowLeft className="w-4 h-4" /> Back to login
               </button>
-              <h2 className="text-2xl font-bold text-white mb-2">Request Access</h2>
-              <p className="text-slate-400 mb-6">Create an account — the owner must approve before you can login</p>
+              <h2 className="text-2xl font-bold text-white mb-2">Create Account</h2>
+              <p className="text-slate-400 mb-6">Start managing your properties today</p>
 
               <form onSubmit={handleSignup} className="space-y-5">
                 <div>
@@ -283,7 +284,7 @@ export default function Login({ onLogin }: Props) {
                   ) : (
                     <>
                       <UserPlus className="w-5 h-5" />
-                      Submit Request
+                      Create Account
                     </>
                   )}
                 </button>
@@ -292,8 +293,9 @@ export default function Login({ onLogin }: Props) {
           )}
         </div>
 
+        {/* Footer */}
         <p className="text-center text-slate-500 text-sm mt-6">
-          Built with ❤️ by <span className="text-indigo-400">RentFlow</span>
+          Built with ❤️ by <span className="text-indigo-400">Bharath</span>
         </p>
       </div>
     </div>
