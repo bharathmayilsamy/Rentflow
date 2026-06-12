@@ -1,7 +1,7 @@
 import { supabase } from './supabase';
 import {
   Property, Tenant, RentPayment, MaintenanceRequest,
-  Expense, Reminder, TenantBill, PassbookEntry, User, Settings, AccountRequest
+  Expense, Reminder, TenantBill, PassbookEntry, User, Settings
 } from '../types';
 
 // ============================================
@@ -36,7 +36,9 @@ export const db_saveProperties = async (properties: Property[]) => {
   const userId = await getUserId();
   if (!userId) return;
 
+  // Delete all existing, then re-insert
   await supabase.from('properties').delete().eq('user_id', userId);
+
   if (properties.length === 0) return;
 
   const rows = properties.map(p => ({
@@ -504,45 +506,6 @@ export const db_saveSettings = async (s: Settings) => {
 };
 
 // ============================================
-// SIGNUP REQUESTS (account approval)
-// ============================================
-export const db_loadSignupRequests = async (): Promise<AccountRequest[] | null> => {
-  const { data, error } = await supabase
-    .from('signup_requests')
-    .select('*')
-    .order('created_at', { ascending: false });
-  if (error) { console.error('Load signup requests error:', error); return null; }
-  return data?.map((r: any) => ({
-    id: r.id,
-    email: r.email || '',
-    name: r.name || '',
-    status: r.status || 'Pending',
-    createdAt: r.created_at?.split('T')[0] || r.created_at_date || '',
-  })) || null;
-};
-
-export const db_createSignupRequest = async (email: string, name: string, authUserId: string) => {
-  const { error } = await supabase.from('signup_requests').upsert({
-    id: authUserId,
-    email: email.toLowerCase(),
-    name,
-    status: 'Pending',
-    created_at_date: new Date().toISOString().split('T')[0],
-  }, { onConflict: 'email' });
-  if (error) console.error('Create signup request error:', error);
-  return { error };
-};
-
-export const db_updateSignupRequest = async (id: string, status: 'Approved' | 'Rejected') => {
-  const { error } = await supabase
-    .from('signup_requests')
-    .update({ status })
-    .eq('id', id);
-  if (error) console.error('Update signup request error:', error);
-  return { error };
-};
-
-// ============================================
 // LOAD ALL DATA AT ONCE
 // ============================================
 export const db_loadAllData = async () => {
@@ -557,7 +520,6 @@ export const db_loadAllData = async () => {
     passbook,
     users,
     settings,
-    signupRequests,
   ] = await Promise.all([
     db_loadProperties(),
     db_loadTenants(),
@@ -569,8 +531,7 @@ export const db_loadAllData = async () => {
     db_loadPassbook(),
     db_loadUsers(),
     db_loadSettings(),
-    db_loadSignupRequests(),
   ]);
 
-  return { properties, tenants, payments, maintenance, expenses, reminders, bills, passbook, users, settings, signupRequests };
+  return { properties, tenants, payments, maintenance, expenses, reminders, bills, passbook, users, settings };
 };
