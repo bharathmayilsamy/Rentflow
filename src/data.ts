@@ -8,94 +8,6 @@ export const generateId = () => Math.random().toString(36).substr(2, 9);
 
 export const generateReceiptNo = () => 'RCP-' + Date.now().toString().slice(-8);
 
-// THESE TWO FUNCTIONS MUST BE IN YOUR data.ts FILE
-export const getRentDueDate = (rentDueDay: number): string => {
-  const now = new Date();
-  const due = new Date(now.getFullYear(), now.getMonth(), rentDueDay);
-  if (due < now) due.setMonth(due.getMonth() + 1);
-  return due.toISOString().split('T')[0];
-};
-
-export const getSuggestedRoomNumber = (propertyId: string, tenants: { propertyId: string; room: string }[]): string => {
-  const propertyTenants = tenants.filter(t => t.propertyId === propertyId);
-  const usedNumbers = propertyTenants
-    .map(t => parseInt(t.room.replace(/\D/g, ''), 10))
-    .filter(n => !isNaN(n));
-  const next = usedNumbers.length > 0 ? Math.max(...usedNumbers) + 1 : 100;
-  return String(next);
-};
-
-export const computeRevenueData = (payments: import('./types').RentPayment[], expenses: import('./types').Expense[]) => {
-  const months: { month: string; income: number; expense: number }[] = [];
-  const now = new Date();
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const month = d.getMonth();
-    const year = d.getFullYear();
-    const income = payments
-      .filter(p => p.status === 'Paid' && p.date)
-      .filter(p => { const pd = new Date(p.date); return pd.getMonth() === month && pd.getFullYear() === year; })
-      .reduce((s, p) => s + p.amount, 0);
-    const expense = expenses
-      .filter(e => e.date)
-      .filter(e => { const ed = new Date(e.date); return ed.getMonth() === month && ed.getFullYear() === year; })
-      .reduce((s, e) => s + e.amount, 0);
-    months.push({ month: d.toLocaleString('en-IN', { month: 'short' }), income, expense });
-  }
-  return months;
-};
-
-export const computeRecentActivities = (
-  payments: import('./types').RentPayment[],
-  maintenance: import('./types').MaintenanceRequest[],
-  passbook: import('./types').PassbookEntry[],
-) => {
-  type Activity = { id: string; text: string; time: string; sortDate: number; type: 'payment' | 'maintenance' | 'tenant' };
-  const activities: Activity[] = [];
-
-  payments.filter(p => p.status === 'Paid' && p.date).forEach(p => {
-    activities.push({
-      id: `pay-${p.id}`,
-      text: `${p.tenantName} paid ₹${p.amount.toLocaleString()} rent via ${p.method}`,
-      time: p.date,
-      sortDate: new Date(p.date).getTime(),
-      type: 'payment',
-    });
-  });
-
-  maintenance.forEach(m => {
-    activities.push({
-      id: `maint-${m.id}`,
-      text: m.status === 'Resolved'
-        ? `Maintenance resolved: ${m.description} at ${m.propertyName}`
-        : `Maintenance request from ${m.tenantName}: ${m.description}`,
-      time: m.createdDate,
-      sortDate: new Date(m.createdDate).getTime(),
-      type: 'maintenance',
-    });
-  });
-
-  passbook.filter(p => p.type === 'Income').slice(-5).forEach(p => {
-    activities.push({
-      id: `pb-${p.id}`,
-      text: `${p.description} — ₹${p.amount.toLocaleString()}`,
-      time: p.date,
-      sortDate: new Date(p.date).getTime(),
-      type: 'payment',
-    });
-  });
-
-  return activities
-    .sort((a, b) => b.sortDate - a.sortDate)
-    .slice(0, 8)
-    .map(({ id, text, time, type }) => ({
-      id,
-      text,
-      time: new Date(time).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
-      type,
-    }));
-};
-
 export const initialProperties: Property[] = [
   { id: 'p1', name: 'Sunrise Apartments', type: 'Apartment', address: '123 MG Road, Bangalore', totalRooms: 20, occupiedRooms: 16, monthlyRent: 15000 },
   { id: 'p2', name: 'Green Valley PG', type: 'PG', address: '45 Koramangala, Bangalore', totalRooms: 30, occupiedRooms: 28, monthlyRent: 8000 },
@@ -192,6 +104,7 @@ export const initialBills: TenantBill[] = [
   { id: 'b6', tenantId: 't4', type: 'Maintenance', description: 'Society Maintenance', amount: 2000, dueDate: '2025-01-05', status: 'Paid', paidDate: '2025-01-03' },
 ];
 
+// Passbook entries - continuous revenue log
 export const initialPassbook: PassbookEntry[] = [
   { id: 'pb1', date: '2024-12-01', type: 'Income', category: 'Rent', description: 'Rent from Rahul Sharma - A-101', amount: 15000, balance: 15000, tenantId: 't1', tenantName: 'Rahul Sharma', propertyId: 'p1', propertyName: 'Sunrise Apartments' },
   { id: 'pb2', date: '2024-12-02', type: 'Income', category: 'Rent', description: 'Rent from Priya Patel - A-202', amount: 15000, balance: 30000, tenantId: 't2', tenantName: 'Priya Patel', propertyId: 'p1', propertyName: 'Sunrise Apartments' },
@@ -209,6 +122,7 @@ export const initialPassbook: PassbookEntry[] = [
   { id: 'pb14', date: '2025-01-12', type: 'Income', category: 'Bill Payment', description: 'Electricity bill from Rahul Sharma', amount: 1500, balance: -7500, tenantId: 't1', tenantName: 'Rahul Sharma', propertyId: 'p1', propertyName: 'Sunrise Apartments' },
 ];
 
+// Users for user management
 export const initialUsers: User[] = [
   { id: 'u1', name: 'Bharath', email: 'bharath@rentflow.com', phone: '9876543200', role: 'Owner', avatar: '#6366f1', isActive: true, createdAt: '2024-01-01', lastLogin: '2025-01-15' },
   { id: 'u2', name: 'Priya Manager', email: 'priya.manager@rentflow.com', phone: '9876543201', role: 'Manager', avatar: '#ec4899', isActive: true, createdAt: '2024-03-15', lastLogin: '2025-01-14' },
