@@ -13,31 +13,10 @@ export const signUp = async (email: string, password: string, name: string) => {
     options: {
       data: {
         name,
-        role: 'Staff',
-        approved: false,
       },
     },
   });
   return { data, error };
-};
-
-export const checkUserApproved = async (email: string, userId: string): Promise<boolean> => {
-  // Check if user is owner (always approved)
-  const { data: { user } } = await supabase.auth.getUser();
-  if (user?.user_metadata?.role === 'Owner') return true;
-  
-  // Check signup_requests table for approval status
-  const { data } = await supabase
-    .from('signup_requests')
-    .select('status')
-    .eq('email', email.toLowerCase())
-    .maybeSingle();
-
-  if (data?.status === 'Approved') return true;
-  if (data?.status === 'Pending' || data?.status === 'Rejected') return false;
-  
-  // Fallback: check user metadata
-  return user?.user_metadata?.approved === true;
 };
 
 export const signIn = async (email: string, password: string) => {
