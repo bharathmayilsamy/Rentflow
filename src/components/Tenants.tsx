@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Tenant, TenantStatus, Property, TenantBill, BillType, BillStatus } from '../types';
-import { generateId, getAvatarColor, getRentDueDate, getSuggestedRoomNumber } from '../data';
-import { Plus, Edit2, Trash2, Eye, Search, X, Phone, Mail, Calendar, Receipt, Zap, Droplets, Wifi, Flame, Wrench, FileText, CheckCircle, Building2, MapPin } from 'lucide-react';
+import { generateId, getAvatarColor } from '../data';
+import { Plus, Edit2, Trash2, Eye, Search, X, Phone, Mail, Calendar, Receipt, Zap, Droplets, Wifi, Flame, Wrench, FileText, CheckCircle } from 'lucide-react';
 
 interface Props {
   tenants: Tenant[];
@@ -12,7 +12,6 @@ interface Props {
   showAddModal?: boolean;
   setShowAddModal?: (show: boolean) => void;
   filterType?: 'active' | 'old';
-  rentDueDay?: number;
 }
 
 const STATUS_COLORS: Record<TenantStatus, string> = { Active: 'bg-green-100 text-green-700', Inactive: 'bg-gray-100 text-gray-600', Notice: 'bg-orange-100 text-orange-700' };
@@ -52,16 +51,13 @@ const emptyBill = (): Omit<TenantBill, 'id' | 'tenantId'> => ({
   status: 'Pending' as BillStatus,
 });
 
-export default function Tenants({ tenants, setTenants, properties, bills, setBills, showAddModal, setShowAddModal, filterType = 'active', rentDueDay = 1 }: Props) {
+export default function Tenants({ tenants, setTenants, properties, bills, setBills, showAddModal, setShowAddModal, filterType = 'active' }: Props) {
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<TenantStatus | ''>('');
   const [filterProperty, setFilterProperty] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [showDetail, setShowDetail] = useState<Tenant | null>(null);
   const [showBillForm, setShowBillForm] = useState(false);
-  const [showAssignForm, setShowAssignForm] = useState(false);
-  const [assignTenantId, setAssignTenantId] = useState<string | null>(null);
-  const [assignForm, setAssignForm] = useState({ propertyId: '', room: '' });
   const [billTenantId, setBillTenantId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyTenant());
@@ -86,11 +82,7 @@ export default function Tenants({ tenants, setTenants, properties, bills, setBil
     return true;
   });
 
-  const openAdd = () => {
-    setForm({ ...emptyTenant(), room: properties.length > 0 ? getSuggestedRoomNumber(properties[0].id, tenants) : '100' });
-    setEditingId(null);
-    setIsFormOpen(true);
-  };
+  const openAdd = () => { setForm(emptyTenant()); setEditingId(null); setIsFormOpen(true); };
   const openEdit = (t: Tenant) => {
     setForm({ name: t.name, email: t.email, phone: t.phone, propertyId: t.propertyId, room: t.room, rent: t.rent, deposit: t.deposit, leaseStart: t.leaseStart, leaseEnd: t.leaseEnd, idProof: t.idProof, emergencyContact: t.emergencyContact, notes: t.notes, status: t.status });
     setEditingId(t.id);
@@ -117,26 +109,6 @@ export default function Tenants({ tenants, setTenants, properties, bills, setBil
   const getTenantBills = (tenantId: string) => bills.filter(b => b.tenantId === tenantId);
   const getPendingBillsCount = (tenantId: string) => bills.filter(b => b.tenantId === tenantId && b.status === 'Pending').length;
   const getPendingBillsTotal = (tenantId: string) => bills.filter(b => b.tenantId === tenantId && b.status === 'Pending').reduce((s, b) => s + b.amount, 0);
-  const getTotalDue = (tenant: Tenant) => tenant.rent + getPendingBillsTotal(tenant.id);
-
-  const openAssign = (tenant: Tenant) => {
-    setAssignTenantId(tenant.id);
-    setAssignForm({
-      propertyId: tenant.propertyId || '',
-      room: tenant.room || getSuggestedRoomNumber(tenant.propertyId || properties[0]?.id || '', tenants),
-    });
-    setShowAssignForm(true);
-  };
-
-  const saveAssign = () => {
-    if (!assignTenantId || !assignForm.propertyId) return;
-    const room = assignForm.room || getSuggestedRoomNumber(assignForm.propertyId, tenants);
-    setTenants(tenants.map(t =>
-      t.id === assignTenantId ? { ...t, propertyId: assignForm.propertyId, room } : t
-    ));
-    setShowAssignForm(false);
-    setAssignTenantId(null);
-  };
 
   const openAddBill = (tenantId: string) => {
     setBillTenantId(tenantId);
@@ -206,10 +178,8 @@ export default function Tenants({ tenants, setTenants, properties, bills, setBil
         {filtered.map(t => {
           const pendingCount = getPendingBillsCount(t.id);
           const pendingTotal = getPendingBillsTotal(t.id);
-          const totalDue = getTotalDue(t);
-          const dueDate = getRentDueDate(rentDueDay);
           return (
-            <div key={t.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 hover:shadow-md transition-shadow cursor-pointer" onClick={() => setShowDetail(t)}>
+            <div key={t.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 hover:shadow-md transition-shadow">
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-3">
                   <div className="w-11 h-11 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0" style={{ backgroundColor: t.avatarColor }}>
@@ -220,32 +190,20 @@ export default function Tenants({ tenants, setTenants, properties, bills, setBil
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[t.status]}`}>{t.status}</span>
                   </div>
                 </div>
-                <div className="flex gap-0.5" onClick={e => e.stopPropagation()}>
+                <div className="flex gap-0.5">
                   <button onClick={() => setShowDetail(t)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-blue-600 transition" title="View Details"><Eye className="w-4 h-4" /></button>
                   <button onClick={() => openEdit(t)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-indigo-600 transition" title="Edit Tenant"><Edit2 className="w-4 h-4" /></button>
                   <button onClick={() => openAddBill(t.id)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-green-600 transition" title="Add Bill"><Receipt className="w-4 h-4" /></button>
                   <button onClick={() => remove(t.id)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-red-600 transition" title="Delete Tenant"><Trash2 className="w-4 h-4" /></button>
                 </div>
               </div>
-
-              {/* Property & Room assignment info */}
-              <div className="mb-3 p-2.5 bg-indigo-50 rounded-lg border border-indigo-100">
-                <div className="flex items-center gap-2 text-sm text-indigo-800">
-                  <Building2 className="w-3.5 h-3.5 shrink-0" />
-                  <span className="font-medium">{t.propertyId ? getPropertyName(t.propertyId) : 'Not assigned'}</span>
-                  {t.room && <span className="text-indigo-600">• Room {t.room}</span>}
-                </div>
-                <div className="flex items-center gap-2 text-xs text-indigo-600 mt-1">
-                  <Calendar className="w-3 h-3 shrink-0" />
-                  <span>Rent due: {dueDate}</span>
-                </div>
-              </div>
-
               <div className="space-y-1.5 text-sm text-gray-600">
-                <p className="flex items-center gap-2"><Mail className="w-3.5 h-3.5 text-gray-400" /> {t.email || '—'}</p>
-                <p className="flex items-center gap-2"><Phone className="w-3.5 h-3.5 text-gray-400" /> {t.phone || '—'}</p>
+                <p className="flex items-center gap-2"><Mail className="w-3.5 h-3.5 text-gray-400" /> {t.email}</p>
+                <p className="flex items-center gap-2"><Phone className="w-3.5 h-3.5 text-gray-400" /> {t.phone}</p>
+                <p className="flex items-center gap-2"><Calendar className="w-3.5 h-3.5 text-gray-400" /> {getPropertyName(t.propertyId)} • Room {t.room}</p>
               </div>
               
+              {/* Pending Bills Indicator */}
               {pendingCount > 0 && (
                 <div className="mt-3 p-2 bg-red-50 rounded-lg border border-red-100">
                   <div className="flex items-center justify-between">
@@ -255,29 +213,9 @@ export default function Tenants({ tenants, setTenants, properties, bills, setBil
                 </div>
               )}
               
-              <div className="mt-3 pt-3 border-t border-gray-50 space-y-1.5" onClick={e => e.stopPropagation()}>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-500">Rent</span>
-                  <span className="text-sm font-semibold text-gray-700">₹{t.rent.toLocaleString()}</span>
-                </div>
-                {pendingTotal > 0 && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-500">Bills</span>
-                    <span className="text-sm font-semibold text-red-600">+ ₹{pendingTotal.toLocaleString()}</span>
-                  </div>
-                )}
-                <div className="flex items-center justify-between pt-1 border-t border-gray-100">
-                  <span className="text-sm font-medium text-gray-700">Total Due</span>
-                  <span className="text-lg font-bold text-indigo-600">₹{totalDue.toLocaleString()}</span>
-                </div>
-                {filterType !== 'old' && (
-                  <button
-                    onClick={() => openAssign(t)}
-                    className="w-full mt-2 flex items-center justify-center gap-1.5 text-xs bg-indigo-600 text-white px-3 py-2 rounded-lg hover:bg-indigo-700 transition font-medium"
-                  >
-                    <MapPin className="w-3 h-3" /> Assign to Property
-                  </button>
-                )}
+              <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-50">
+                <span className="text-sm text-gray-500">Monthly Rent</span>
+                <span className="text-lg font-bold text-indigo-600">₹{t.rent.toLocaleString()}</span>
               </div>
             </div>
           );
@@ -313,11 +251,8 @@ export default function Tenants({ tenants, setTenants, properties, bills, setBil
                 ['Email', showDetail.email],
                 ['Phone', showDetail.phone],
                 ['Property', getPropertyName(showDetail.propertyId)],
-                ['Room', showDetail.room || '—'],
-                ['Rent Due Date', getRentDueDate(rentDueDay)],
+                ['Room', showDetail.room],
                 ['Monthly Rent', `₹${showDetail.rent.toLocaleString()}`],
-                ['Pending Bills', `₹${getPendingBillsTotal(showDetail.id).toLocaleString()}`],
-                ['Total Due', `₹${getTotalDue(showDetail).toLocaleString()}`],
                 ['Deposit', `₹${showDetail.deposit.toLocaleString()}`],
                 ['Lease Start', showDetail.leaseStart],
                 ['Lease End', showDetail.leaseEnd],
@@ -410,17 +345,14 @@ export default function Tenants({ tenants, setTenants, properties, bills, setBil
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Property</label>
-                <select value={form.propertyId} onChange={e => {
-                  const pid = e.target.value;
-                  setForm({ ...form, propertyId: pid, room: pid ? getSuggestedRoomNumber(pid, tenants.filter(t => t.id !== editingId)) : form.room });
-                }} className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                <select value={form.propertyId} onChange={e => setForm({ ...form, propertyId: e.target.value })} className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
                   <option value="">Select Property</option>
                   {properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Room</label>
-                <input value={form.room} onChange={e => setForm({ ...form, room: e.target.value })} className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none" placeholder="e.g. 100, 101" />
+                <input value={form.room} onChange={e => setForm({ ...form, room: e.target.value })} className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none" placeholder="Room number" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Monthly Rent (₹)</label>
@@ -464,51 +396,6 @@ export default function Tenants({ tenants, setTenants, properties, bills, setBil
               <button onClick={save} className="flex-1 bg-indigo-600 text-white py-2.5 rounded-xl font-medium text-sm hover:bg-indigo-700 transition">
                 {editingId ? 'Update' : 'Add'} Tenant
               </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Assign to Property Modal */}
-      {showAssignForm && assignTenantId && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowAssignForm(false)}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="text-xl font-bold">Assign to Property</h2>
-              <button onClick={() => setShowAssignForm(false)} className="p-1 hover:bg-gray-100 rounded-lg"><X className="w-5 h-5" /></button>
-            </div>
-            <div className="p-3 bg-gray-50 rounded-xl mb-4">
-              <p className="text-sm text-gray-500">Tenant: <span className="font-medium text-gray-900">{tenants.find(t => t.id === assignTenantId)?.name}</span></p>
-            </div>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Property*</label>
-                <select
-                  value={assignForm.propertyId}
-                  onChange={e => setAssignForm({
-                    propertyId: e.target.value,
-                    room: getSuggestedRoomNumber(e.target.value, tenants.filter(t => t.id !== assignTenantId)),
-                  })}
-                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                >
-                  <option value="">Select Property</option>
-                  {properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Room Number</label>
-                <input
-                  value={assignForm.room}
-                  onChange={e => setAssignForm({ ...assignForm, room: e.target.value })}
-                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
-                  placeholder="e.g. 100, 101"
-                />
-                <p className="text-xs text-gray-400 mt-1">Auto-suggested based on existing rooms in property</p>
-              </div>
-              <div className="flex gap-3 pt-2">
-                <button onClick={() => setShowAssignForm(false)} className="flex-1 border border-gray-200 text-gray-700 py-2.5 rounded-xl font-medium text-sm hover:bg-gray-50 transition">Cancel</button>
-                <button onClick={saveAssign} className="flex-1 bg-indigo-600 text-white py-2.5 rounded-xl font-medium text-sm hover:bg-indigo-700 transition">Assign</button>
-              </div>
             </div>
           </div>
         </div>
