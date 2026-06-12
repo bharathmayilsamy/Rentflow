@@ -1,12 +1,11 @@
 import { useState } from 'react';
-import { Property, PropertyType, Tenant } from '../types';
+import { Property, PropertyType } from '../types';
 import { generateId } from '../data';
-import { Plus, Edit2, Trash2, Building2, Home, Hotel, Store, X, Users } from 'lucide-react';
+import { Plus, Edit2, Trash2, Building2, Home, Hotel, Store, X } from 'lucide-react';
 
 interface Props {
   properties: Property[];
   setProperties: (p: Property[]) => void;
-  tenants: Tenant[];
 }
 
 const PROPERTY_TYPES: PropertyType[] = ['Apartment', 'PG', 'Hostel', 'House', 'Commercial'];
@@ -15,13 +14,10 @@ const typeColors: Record<PropertyType, string> = { Apartment: 'bg-blue-100 text-
 
 const emptyProperty: Omit<Property, 'id'> = { name: '', type: 'Apartment', address: '', totalRooms: 1, occupiedRooms: 0, monthlyRent: 0 };
 
-export default function Properties({ properties, setProperties, tenants }: Props) {
+export default function Properties({ properties, setProperties }: Props) {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<Omit<Property, 'id'>>(emptyProperty);
-
-  const getPropertyTenants = (propertyId: string) =>
-    tenants.filter(t => t.propertyId === propertyId && t.status !== 'Inactive');
 
   const openAdd = () => { setForm(emptyProperty); setEditingId(null); setShowForm(true); };
   const openEdit = (p: Property) => { setForm({ name: p.name, type: p.type, address: p.address, totalRooms: p.totalRooms, occupiedRooms: p.occupiedRooms, monthlyRent: p.monthlyRent }); setEditingId(p.id); setShowForm(true); };
@@ -36,11 +32,7 @@ export default function Properties({ properties, setProperties, tenants }: Props
     setShowForm(false);
   };
 
-  const remove = (id: string) => {
-    if (confirm('Are you sure you want to delete this property?')) {
-      setProperties(properties.filter(p => p.id !== id));
-    }
-  };
+  const remove = (id: string) => setProperties(properties.filter(p => p.id !== id));
 
   return (
     <div className="space-y-6">
@@ -56,9 +48,7 @@ export default function Properties({ properties, setProperties, tenants }: Props
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
         {properties.map((p) => {
-          const propertyTenants = getPropertyTenants(p.id);
-          const occupied = propertyTenants.length;
-          const pct = p.totalRooms > 0 ? Math.round((occupied / p.totalRooms) * 100) : 0;
+          const pct = Math.round((p.occupiedRooms / p.totalRooms) * 100);
           const Icon = typeIcons[p.type];
           return (
             <div key={p.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 hover:shadow-md transition-shadow">
@@ -79,33 +69,12 @@ export default function Properties({ properties, setProperties, tenants }: Props
               </div>
               <p className="text-sm text-gray-500 mb-3">{p.address}</p>
               <div className="flex items-center justify-between text-sm mb-2">
-                <span className="text-gray-600">Occupancy: {occupied}/{p.totalRooms} rooms</span>
+                <span className="text-gray-600">Occupancy: {p.occupiedRooms}/{p.totalRooms} rooms</span>
                 <span className="font-medium text-gray-900">{pct}%</span>
               </div>
               <div className="w-full bg-gray-100 rounded-full h-2.5 mb-3">
                 <div className={`h-2.5 rounded-full ${pct >= 90 ? 'bg-green-500' : pct >= 70 ? 'bg-blue-500' : pct >= 50 ? 'bg-yellow-500' : 'bg-red-500'}`} style={{ width: `${pct}%` }} />
               </div>
-
-              {/* Tenants assigned to this property */}
-              <div className="mb-3 pt-2 border-t border-gray-100">
-                <div className="flex items-center gap-1.5 mb-2">
-                  <Users className="w-3.5 h-3.5 text-gray-400" />
-                  <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Tenants ({propertyTenants.length})</span>
-                </div>
-                {propertyTenants.length === 0 ? (
-                  <p className="text-xs text-gray-400">No tenants assigned. Click "Assign" on tenant card.</p>
-                ) : (
-                  <div className="space-y-1.5 max-h-32 overflow-y-auto">
-                    {propertyTenants.map(t => (
-                      <div key={t.id} className="flex items-center justify-between text-sm bg-gray-50 rounded-lg px-2.5 py-1.5">
-                        <span className="font-medium text-gray-800 truncate">{t.name}</span>
-                        <span className="text-xs text-indigo-600 font-medium shrink-0 ml-2">Room {t.room || '—'}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
               <div className="flex items-center justify-between pt-2 border-t border-gray-50">
                 <span className="text-sm text-gray-500">Monthly Rent</span>
                 <span className="text-lg font-bold text-indigo-600">₹{p.monthlyRent.toLocaleString()}</span>
@@ -115,13 +84,7 @@ export default function Properties({ properties, setProperties, tenants }: Props
         })}
       </div>
 
-      {properties.length === 0 && (
-        <div className="text-center py-12 text-gray-400">
-          <p className="text-lg">No properties yet</p>
-          <p className="text-sm mt-1">Add your first property to get started</p>
-        </div>
-      )}
-
+      {/* Modal */}
       {showForm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowForm(false)}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6" onClick={e => e.stopPropagation()}>
@@ -136,7 +99,7 @@ export default function Properties({ properties, setProperties, tenants }: Props
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
-                <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value as PropertyType })} className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value as PropertyType })} className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
                   {PROPERTY_TYPES.map(t => <option key={t}>{t}</option>)}
                 </select>
               </div>
