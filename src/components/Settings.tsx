@@ -261,8 +261,45 @@ export default function SettingsPage({ settings, setSettings, users, setUsers, c
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Rent Due Day</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Default Rent Due Day</label>
                 <input type="number" min={1} max={31} value={settings.rentDueDay} onChange={e => update({ rentDueDay: +e.target.value })} className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none" />
+              </div>
+            </div>
+
+            {/* Custom Bill Types */}
+            <div className="mt-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Custom Bill Types</label>
+              <p className="text-xs text-gray-400 mb-3">Add or remove bill categories that appear when adding tenant bills</p>
+              <div className="flex flex-wrap gap-2 mb-3">
+                {(settings.customBillTypes || []).map((bt, i) => (
+                  <span key={i} className="flex items-center gap-1.5 bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-lg text-sm font-medium">
+                    {bt}
+                    <button onClick={() => update({ customBillTypes: settings.customBillTypes.filter((_, idx) => idx !== i) })} className="hover:text-red-600 transition">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <input id="newBillType" placeholder="e.g., Parking, Laundry" className="flex-1 border border-gray-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      const input = e.target as HTMLInputElement;
+                      const val = input.value.trim();
+                      if (val && !(settings.customBillTypes || []).includes(val)) {
+                        update({ customBillTypes: [...(settings.customBillTypes || []), val] });
+                        input.value = '';
+                      }
+                    }
+                  }} />
+                <button onClick={() => {
+                  const input = document.getElementById('newBillType') as HTMLInputElement;
+                  const val = input?.value.trim();
+                  if (val && !(settings.customBillTypes || []).includes(val)) {
+                    update({ customBillTypes: [...(settings.customBillTypes || []), val] });
+                    input.value = '';
+                  }
+                }} className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-indigo-700 transition">Add</button>
               </div>
             </div>
           </div>

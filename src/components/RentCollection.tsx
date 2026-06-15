@@ -31,6 +31,8 @@ export default function RentCollection({ payments, setPayments, tenants, propert
   const [showPayForm, setShowPayForm] = useState(false);
   const [showDueForm, setShowDueForm] = useState(false);
   const [showExpenseForm, setShowExpenseForm] = useState(false);
+  const [showManualRent, setShowManualRent] = useState(false);
+  const [manualRent, setManualRent] = useState({ tenantId: '', amount: 0, method: 'UPI' as PaymentMethod, date: new Date().toISOString().split('T')[0] });
   const [selectedPayment, setSelectedPayment] = useState<RentPayment | null>(null);
   const [payAmount, setPayAmount] = useState(0);
   const [payMethod, setPayMethod] = useState<PaymentMethod>('UPI');
@@ -154,9 +156,12 @@ export default function RentCollection({ payments, setPayments, tenants, propert
                 </div>
               </div>
             </div>
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex items-center justify-center">
-              <button onClick={() => setShowDueForm(true)} className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2.5 rounded-xl hover:bg-indigo-700 transition font-medium text-sm shadow-sm">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex flex-col items-center justify-center gap-2">
+              <button onClick={() => setShowDueForm(true)} className="w-full flex items-center justify-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-xl hover:bg-indigo-700 transition font-medium text-sm shadow-sm">
                 <Plus className="w-4 h-4" /> Generate Due
+              </button>
+              <button onClick={() => setShowManualRent(true)} className="w-full flex items-center justify-center gap-2 bg-green-600 text-white px-4 py-2 rounded-xl hover:bg-green-700 transition font-medium text-sm shadow-sm">
+                <CreditCard className="w-4 h-4" /> Record Rent
               </button>
             </div>
           </div>
@@ -518,6 +523,73 @@ export default function RentCollection({ payments, setPayments, tenants, propert
               <div className="flex gap-3 pt-2">
                 <button onClick={() => setShowExpenseForm(false)} className="flex-1 border border-gray-200 text-gray-700 py-2.5 rounded-xl font-medium text-sm hover:bg-gray-50 transition">Cancel</button>
                 <button onClick={addExpense} className="flex-1 bg-indigo-600 text-white py-2.5 rounded-xl font-medium text-sm hover:bg-indigo-700 transition">Add Expense</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Manual Rent Recording Modal */}
+      {showManualRent && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowManualRent(false)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-xl font-bold">Record Rent Payment</h2>
+              <button onClick={() => setShowManualRent(false)} className="p-1 hover:bg-gray-100 rounded-lg"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Tenant</label>
+                <select value={manualRent.tenantId} onChange={e => {
+                  const t = tenants.find(t => t.id === e.target.value);
+                  setManualRent({ ...manualRent, tenantId: e.target.value, amount: t?.rent || 0 });
+                }} className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                  <option value="">Select tenant</option>
+                  {tenants.filter(t => t.status === 'Active').map(t => <option key={t.id} value={t.id}>{t.name} - Room {t.room}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Amount (₹)</label>
+                <input type="number" value={manualRent.amount} onChange={e => setManualRent({ ...manualRent, amount: +e.target.value })} className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Payment Date</label>
+                <input type="date" value={manualRent.date} onChange={e => setManualRent({ ...manualRent, date: e.target.value })} className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Payment Method</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {METHODS.map(m => {
+                    const MIcon = METHOD_ICONS[m];
+                    return (
+                      <button key={m} onClick={() => setManualRent({ ...manualRent, method: m })} className={`flex flex-col items-center gap-1 p-3 rounded-xl border-2 text-xs font-medium transition ${manualRent.method === m ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}>
+                        <MIcon className="w-4 h-4" />{m}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button onClick={() => setShowManualRent(false)} className="flex-1 border border-gray-200 text-gray-700 py-2.5 rounded-xl font-medium text-sm hover:bg-gray-50 transition">Cancel</button>
+                <button onClick={() => {
+                  const tenant = tenants.find(t => t.id === manualRent.tenantId);
+                  if (!tenant) return;
+                  // Check if there's an existing pending due for this tenant
+                  const existingDue = payments.find(p => p.tenantId === tenant.id && (p.status === 'Pending' || p.status === 'Overdue'));
+                  if (existingDue) {
+                    const newAmt = existingDue.amount + manualRent.amount;
+                    const newStatus = newAmt >= existingDue.dueAmount ? 'Paid' as PaymentStatus : 'Partial' as PaymentStatus;
+                    setPayments(payments.map(p => p.id === existingDue.id ? { ...p, amount: newAmt, status: newStatus, method: manualRent.method, date: manualRent.date, receiptNo: p.receiptNo || generateReceiptNo() } : p));
+                  } else {
+                    setPayments([...payments, {
+                      id: generateId(), tenantId: tenant.id, tenantName: tenant.name, propertyId: tenant.propertyId, room: tenant.room,
+                      amount: manualRent.amount, dueAmount: manualRent.amount, method: manualRent.method, status: 'Paid',
+                      date: manualRent.date, dueDate: manualRent.date, receiptNo: generateReceiptNo(),
+                    }]);
+                  }
+                  setShowManualRent(false);
+                  setManualRent({ tenantId: '', amount: 0, method: 'UPI', date: new Date().toISOString().split('T')[0] });
+                }} className="flex-1 bg-green-600 text-white py-2.5 rounded-xl font-medium text-sm hover:bg-green-700 transition">Record Payment</button>
               </div>
             </div>
           </div>

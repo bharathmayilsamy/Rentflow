@@ -81,6 +81,7 @@ export const db_loadTenants = async (): Promise<Tenant[] | null> => {
     notes: r.notes || '',
     status: r.status || 'Active',
     avatarColor: r.avatar_color || '#6366f1',
+    dueDay: r.due_day || 1,
   })) || null;
 };
 
@@ -108,6 +109,7 @@ export const db_saveTenants = async (tenants: Tenant[]) => {
     notes: t.notes,
     status: t.status,
     avatar_color: t.avatarColor,
+    due_day: t.dueDay || 1,
   }));
 
   const { error } = await supabase.from('tenants').upsert(rows);
@@ -473,6 +475,7 @@ export const db_loadSettings = async (): Promise<Settings | null> => {
     currency: data.currency || 'INR',
     dateFormat: data.date_format || 'DD/MM/YYYY',
     rentDueDay: data.rent_due_day || 1,
+    customBillTypes: data.custom_bill_types || ['Electricity', 'Water', 'Tax', 'Internet', 'Gas', 'Maintenance', 'Other'],
   };
 };
 
@@ -497,6 +500,7 @@ export const db_saveSettings = async (s: Settings) => {
     currency: s.currency,
     date_format: s.dateFormat,
     rent_due_day: s.rentDueDay,
+    custom_bill_types: s.customBillTypes,
   };
 
   const { error } = await supabase

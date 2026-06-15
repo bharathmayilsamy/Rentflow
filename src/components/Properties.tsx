@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Property, PropertyType } from '../types';
+import { Property, PropertyType, Tenant } from '../types';
 import { generateId } from '../data';
-import { Plus, Edit2, Trash2, Building2, Home, Hotel, Store, X } from 'lucide-react';
+import { Plus, Edit2, Trash2, Building2, Home, Hotel, Store, X, Users } from 'lucide-react';
 
 interface Props {
   properties: Property[];
   setProperties: (p: Property[]) => void;
+  tenants: Tenant[];
 }
 
 const PROPERTY_TYPES: PropertyType[] = ['Apartment', 'PG', 'Hostel', 'House', 'Commercial'];
@@ -14,7 +15,7 @@ const typeColors: Record<PropertyType, string> = { Apartment: 'bg-blue-100 text-
 
 const emptyProperty: Omit<Property, 'id'> = { name: '', type: 'Apartment', address: '', totalRooms: 1, occupiedRooms: 0, monthlyRent: 0 };
 
-export default function Properties({ properties, setProperties }: Props) {
+export default function Properties({ properties, setProperties, tenants }: Props) {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<Omit<Property, 'id'>>(emptyProperty);
@@ -48,7 +49,9 @@ export default function Properties({ properties, setProperties }: Props) {
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
         {properties.map((p) => {
-          const pct = Math.round((p.occupiedRooms / p.totalRooms) * 100);
+          const activeTenants = tenants.filter(t => t.propertyId === p.id && t.status === 'Active');
+          const occupiedCount = activeTenants.length;
+          const pct = p.totalRooms > 0 ? Math.round((occupiedCount / p.totalRooms) * 100) : 0;
           const Icon = typeIcons[p.type];
           return (
             <div key={p.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 hover:shadow-md transition-shadow">
@@ -67,13 +70,28 @@ export default function Properties({ properties, setProperties }: Props) {
                   <button onClick={() => remove(p.id)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-red-600 transition"><Trash2 className="w-4 h-4" /></button>
                 </div>
               </div>
-              <p className="text-sm text-gray-500 mb-3">{p.address}</p>
+              <p className="text-sm text-gray-500 mb-3">{p.address || 'No address'}</p>
+              {/* Tenants assigned */}
+              <div className="flex items-center gap-2 mb-3">
+                <Users className="w-4 h-4 text-indigo-500" />
+                <span className="text-sm text-gray-700 font-medium">{occupiedCount} tenant{occupiedCount !== 1 ? 's' : ''}</span>
+                {activeTenants.length > 0 && (
+                  <div className="flex -space-x-2 ml-auto">
+                    {activeTenants.slice(0, 4).map(t => (
+                      <div key={t.id} className="w-6 h-6 rounded-full border-2 border-white flex items-center justify-center text-[8px] text-white font-bold" style={{ backgroundColor: t.avatarColor }} title={t.name}>
+                        {t.name.charAt(0)}
+                      </div>
+                    ))}
+                    {activeTenants.length > 4 && <div className="w-6 h-6 rounded-full border-2 border-white bg-gray-200 flex items-center justify-center text-[8px] text-gray-600 font-bold">+{activeTenants.length - 4}</div>}
+                  </div>
+                )}
+              </div>
               <div className="flex items-center justify-between text-sm mb-2">
-                <span className="text-gray-600">Occupancy: {p.occupiedRooms}/{p.totalRooms} rooms</span>
-                <span className="font-medium text-gray-900">{pct}%</span>
+                <span className="text-gray-600">Occupancy: {occupiedCount}/{p.totalRooms} rooms</span>
+                <span className="font-medium text-gray-900">{Math.min(pct, 100)}%</span>
               </div>
               <div className="w-full bg-gray-100 rounded-full h-2.5 mb-3">
-                <div className={`h-2.5 rounded-full ${pct >= 90 ? 'bg-green-500' : pct >= 70 ? 'bg-blue-500' : pct >= 50 ? 'bg-yellow-500' : 'bg-red-500'}`} style={{ width: `${pct}%` }} />
+                <div className={`h-2.5 rounded-full ${pct >= 90 ? 'bg-green-500' : pct >= 70 ? 'bg-blue-500' : pct >= 50 ? 'bg-yellow-500' : 'bg-red-500'}`} style={{ width: `${Math.min(pct, 100)}%` }} />
               </div>
               <div className="flex items-center justify-between pt-2 border-t border-gray-50">
                 <span className="text-sm text-gray-500">Monthly Rent</span>

@@ -240,10 +240,10 @@ function App() {
   const renderContent = () => {
     switch (activeTab) {
       case 'dashboard': return <Dashboard properties={properties} tenants={tenants} payments={payments} maintenance={maintenance} />;
-      case 'properties': return <Properties properties={properties} setProperties={setProperties} />;
-      case 'tenants': return <Tenants tenants={tenants} setTenants={setTenants} properties={properties} bills={bills} setBills={setBills} showAddModal={showAddTenant} setShowAddModal={setShowAddTenant} filterType={tenantFilter} />;
+      case 'properties': return <Properties properties={properties} setProperties={setProperties} tenants={tenants} />;
+      case 'tenants': return <Tenants tenants={tenants} setTenants={setTenants} properties={properties} bills={bills} setBills={setBills} payments={payments} settings={settings} showAddModal={showAddTenant} setShowAddModal={setShowAddTenant} filterType={tenantFilter} />;
       case 'rent': return <RentCollection payments={payments} setPayments={setPayments} tenants={tenants} properties={properties} expenses={expenses} setExpenses={setExpenses} activeSubTab={activeSubTab as 'dues' | 'collection' | 'expense' | null} />;
-      case 'passbook': return <Passbook passbook={passbook} setPassbook={setPassbook} properties={properties} tenants={tenants} />;
+      case 'passbook': return <Passbook payments={payments} expenses={expenses} bills={bills} tenants={tenants} properties={properties} />;
       case 'maintenance': return <Maintenance requests={maintenance} setRequests={setMaintenance} properties={properties} tenants={tenants} />;
       case 'reports': return <Reports expenses={expenses} setExpenses={setExpenses} properties={properties} payments={payments} tenants={tenants} bills={bills} />;
       case 'reminders': return <Reminders reminders={reminders} setReminders={setReminders} tenants={tenants} />;
