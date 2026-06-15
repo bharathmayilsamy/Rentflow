@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { TabKey, Property, Tenant, RentPayment, MaintenanceRequest, Expense, Reminder, Settings, TenantBill, PassbookEntry, User, AuthUser } from './types';
+import { TabKey, Property, Tenant, RentPayment, MaintenanceRequest, Expense, Reminder, Settings, TenantBill, User, AuthUser } from './types';
 import { initialSettings } from './data';
 import { supabase, signOut, onAuthStateChange } from './lib/supabase';
-import { db_loadAllData, db_saveProperties, db_saveTenants, db_savePayments, db_saveMaintenance, db_saveExpenses, db_saveReminders, db_saveBills, db_savePassbook, db_saveUsers, db_saveSettings } from './lib/database';
+import { db_loadAllData, db_saveProperties, db_saveTenants, db_savePayments, db_saveMaintenance, db_saveExpenses, db_saveReminders, db_saveBills, db_saveUsers, db_saveSettings } from './lib/database';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import Properties from './components/Properties';
@@ -66,7 +66,6 @@ function App() {
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [settings, setSettings] = useState<Settings>(initialSettings);
   const [bills, setBills] = useState<TenantBill[]>([]);
-  const [passbook, setPassbook] = useState<PassbookEntry[]>([]);
   const [users, setUsers] = useState<User[]>([]);
 
   const [showAddTenant, setShowAddTenant] = useState(false);
@@ -127,7 +126,6 @@ function App() {
         setExpenses([]);
         setReminders([]);
         setBills([]);
-        setPassbook([]);
         setUsers([]);
         setSettings(initialSettings);
       }
@@ -152,7 +150,6 @@ function App() {
         setExpenses(data.expenses || []);
         setReminders(data.reminders || []);
         setBills(data.bills || []);
-        setPassbook(data.passbook || []);
         setUsers(data.users || []);
         if (data.settings) setSettings(data.settings);
 
@@ -178,7 +175,6 @@ function App() {
   useEffect(() => { if (dbReady && dataLoaded) debouncedSave('expenses', () => db_saveExpenses(expenses)); }, [expenses, dbReady, dataLoaded, debouncedSave]);
   useEffect(() => { if (dbReady && dataLoaded) debouncedSave('reminders', () => db_saveReminders(reminders)); }, [reminders, dbReady, dataLoaded, debouncedSave]);
   useEffect(() => { if (dbReady && dataLoaded) debouncedSave('bills', () => db_saveBills(bills)); }, [bills, dbReady, dataLoaded, debouncedSave]);
-  useEffect(() => { if (dbReady && dataLoaded) debouncedSave('passbook', () => db_savePassbook(passbook)); }, [passbook, dbReady, dataLoaded, debouncedSave]);
   useEffect(() => { if (dbReady && dataLoaded) debouncedSave('users', () => db_saveUsers(users)); }, [users, dbReady, dataLoaded, debouncedSave]);
   useEffect(() => { if (dbReady && dataLoaded) debouncedSave('settings', () => db_saveSettings(settings)); }, [settings, dbReady, dataLoaded, debouncedSave]);
 
@@ -203,7 +199,6 @@ function App() {
     setExpenses([]);
     setReminders([]);
     setBills([]);
-    setPassbook([]);
     setUsers([]);
     setSettings(initialSettings);
   };
