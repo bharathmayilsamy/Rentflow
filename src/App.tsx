@@ -13,35 +13,17 @@ import Reports from './components/Reports';
 import Reminders from './components/Reminders';
 import SettingsPage from './components/Settings';
 import Passbook from './components/Passbook';
+import Toast, { ToastMessage } from './components/Toast';
 import { LayoutDashboard, Building2, Users, Wallet, Wrench, Bell, Settings as SettingsIcon, Menu, X, Home, ChevronDown, UserPlus, UserCheck, UserX, Receipt, CreditCard, TrendingDown, BookOpen, Loader2 } from 'lucide-react';
 
 type SubTab = 'dues' | 'collection' | 'expense' | 'tenant' | 'add-tenant' | 'old-tenants';
-
-interface NavSection {
-  key: string;
-  label: string;
-  icon: any;
-  tab?: TabKey;
-  children?: { key: SubTab | TabKey; label: string; icon: any }[];
-}
+interface NavSection { key: string; label: string; icon: any; tab?: TabKey; children?: { key: SubTab | TabKey; label: string; icon: any }[]; }
 
 const NAV_SECTIONS: NavSection[] = [
   { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, tab: 'dashboard' },
   { key: 'properties', label: 'Properties', icon: Building2, tab: 'properties' },
-  { key: 'money', label: 'Money', icon: Wallet,
-    children: [
-      { key: 'dues', label: 'Dues', icon: Receipt },
-      { key: 'collection', label: 'Collection', icon: CreditCard },
-      { key: 'expense', label: 'Expense', icon: TrendingDown },
-    ]
-  },
-  { key: 'people', label: 'People', icon: Users,
-    children: [
-      { key: 'tenant', label: 'Tenants', icon: UserCheck },
-      { key: 'add-tenant', label: 'Add Tenant', icon: UserPlus },
-      { key: 'old-tenants', label: 'Old Tenants', icon: UserX },
-    ]
-  },
+  { key: 'money', label: 'Money', icon: Wallet, children: [{ key: 'dues', label: 'Dues', icon: Receipt }, { key: 'collection', label: 'Collection', icon: CreditCard }, { key: 'expense', label: 'Expense', icon: TrendingDown }] },
+  { key: 'people', label: 'People', icon: Users, children: [{ key: 'tenant', label: 'Tenants', icon: UserCheck }, { key: 'add-tenant', label: 'Add Tenant', icon: UserPlus }, { key: 'old-tenants', label: 'Old Tenants', icon: UserX }] },
   { key: 'passbook', label: 'Passbook', icon: BookOpen, tab: 'passbook' },
   { key: 'maintenance', label: 'Maintenance', icon: Wrench, tab: 'maintenance' },
   { key: 'reminders', label: 'Reminders', icon: Bell, tab: 'reminders' },
@@ -57,7 +39,6 @@ function App() {
   const [expandedSections, setExpandedSections] = useState<string[]>(['money', 'people']);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // START WITH EMPTY DATA - only load from Supabase
   const [properties, setProperties] = useState<Property[]>([]);
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [payments, setPayments] = useState<RentPayment[]>([]);
@@ -70,79 +51,58 @@ function App() {
 
   const [showAddTenant, setShowAddTenant] = useState(false);
   const [tenantFilter, setTenantFilter] = useState<'active' | 'old'>('active');
-  const [dbReady, setDbReady] = useState(false);
-  const [dataLoaded, setDataLoaded] = useState(false);
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
-  // Debounce timer refs
+  // CRITICAL: Track whether saves should be active
+  // Saves only activate AFTER initial load + a delay
+  const savingEnabled = useRef(false);
   const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
-  const debouncedSave = useCallback((key: string, saveFn: () => Promise<void>, delay = 1000) => {
+  const addToast = useCallback((text: string, type: 'success' | 'error' | 'info' = 'success') => {
+    setToasts(prev => [...prev, { id: Date.now().toString(), text, type }]);
+  }, []);
+  const removeToast = useCallback((id: string) => { setToasts(prev => prev.filter(t => t.id !== id)); }, []);
+
+  const debouncedSave = useCallback((key: string, saveFn: () => Promise<void>) => {
+    if (!savingEnabled.current) return; // Block saves during load
     if (saveTimers.current[key]) clearTimeout(saveTimers.current[key]);
-    saveTimers.current[key] = setTimeout(() => { saveFn(); }, delay);
+    saveTimers.current[key] = setTimeout(() => { saveFn(); }, 2000);
   }, []);
 
-  // Auth check on mount
+  // Auth
   useEffect(() => {
     const checkAuth = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
-          setCurrentUser({
-            id: session.user.id,
-            email: session.user.email || '',
-            name: session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'User',
-            role: session.user.user_metadata?.role || 'Owner',
-          });
+          setCurrentUser({ id: session.user.id, email: session.user.email || '', name: session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'User', role: session.user.user_metadata?.role || 'Owner' });
           setIsAuthenticated(true);
         }
-      } catch (err) {
-        console.error('Auth check failed:', err);
-      } finally {
-        setIsLoading(false);
-      }
+      } catch (err) { console.error('Auth check failed:', err); }
+      finally { setIsLoading(false); }
     };
     checkAuth();
-
     const { data: { subscription } } = onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN' && session?.user) {
-        setCurrentUser({
-          id: session.user.id,
-          email: session.user.email || '',
-          name: session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'User',
-          role: session.user.user_metadata?.role || 'Owner',
-        });
+        setCurrentUser({ id: session.user.id, email: session.user.email || '', name: session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'User', role: session.user.user_metadata?.role || 'Owner' });
         setIsAuthenticated(true);
-        setDataLoaded(false); // Reset to load fresh data
       } else if (event === 'SIGNED_OUT') {
-        setCurrentUser(null);
-        setIsAuthenticated(false);
-        setDbReady(false);
-        setDataLoaded(false);
-        // Clear all data on logout
-        setProperties([]);
-        setTenants([]);
-        setPayments([]);
-        setMaintenance([]);
-        setExpenses([]);
-        setReminders([]);
-        setBills([]);
-        setUsers([]);
-        setSettings(initialSettings);
+        setCurrentUser(null); setIsAuthenticated(false); savingEnabled.current = false;
+        setProperties([]); setTenants([]); setPayments([]); setMaintenance([]);
+        setExpenses([]); setReminders([]); setBills([]); setUsers([]); setSettings(initialSettings);
       }
     });
     return () => { subscription.unsubscribe(); };
   }, []);
 
-  // Load data from Supabase after login
+  // Load data from Supabase
   useEffect(() => {
-    if (!isAuthenticated || !currentUser || dataLoaded) return;
+    if (!isAuthenticated || !currentUser) return;
+    savingEnabled.current = false; // Disable saves during load
 
     const loadData = async () => {
       try {
-        console.log('Loading data from Supabase for user:', currentUser.id);
         const data = await db_loadAllData();
-
-        // Load whatever is in Supabase (could be empty, that's OK)
         setProperties(data.properties || []);
         setTenants(data.tenants || []);
         setPayments(data.payments || []);
@@ -152,65 +112,39 @@ function App() {
         setBills(data.bills || []);
         setUsers(data.users || []);
         if (data.settings) setSettings(data.settings);
-
-        console.log('Data loaded:', {
-          properties: data.properties?.length || 0,
-          tenants: data.tenants?.length || 0,
-        });
-      } catch (err) {
-        console.error('Failed to load from Supabase:', err);
-      } finally {
-        setDataLoaded(true);
-        setDbReady(true);
-      }
+      } catch (err) { console.error('Load failed:', err); }
+      
+      // Enable saves after a delay so initial state changes settle
+      setTimeout(() => { savingEnabled.current = true; }, 3000);
     };
     loadData();
-  }, [isAuthenticated, currentUser, dataLoaded]);
+  }, [isAuthenticated, currentUser]);
 
-  // Save to Supabase when data changes (only after initial load is complete)
-  useEffect(() => { if (dbReady && dataLoaded) debouncedSave('properties', () => db_saveProperties(properties)); }, [properties, dbReady, dataLoaded, debouncedSave]);
-  useEffect(() => { if (dbReady && dataLoaded) debouncedSave('tenants', () => db_saveTenants(tenants)); }, [tenants, dbReady, dataLoaded, debouncedSave]);
-  useEffect(() => { if (dbReady && dataLoaded) debouncedSave('payments', () => db_savePayments(payments)); }, [payments, dbReady, dataLoaded, debouncedSave]);
-  useEffect(() => { if (dbReady && dataLoaded) debouncedSave('maintenance', () => db_saveMaintenance(maintenance)); }, [maintenance, dbReady, dataLoaded, debouncedSave]);
-  useEffect(() => { if (dbReady && dataLoaded) debouncedSave('expenses', () => db_saveExpenses(expenses)); }, [expenses, dbReady, dataLoaded, debouncedSave]);
-  useEffect(() => { if (dbReady && dataLoaded) debouncedSave('reminders', () => db_saveReminders(reminders)); }, [reminders, dbReady, dataLoaded, debouncedSave]);
-  useEffect(() => { if (dbReady && dataLoaded) debouncedSave('bills', () => db_saveBills(bills)); }, [bills, dbReady, dataLoaded, debouncedSave]);
-  useEffect(() => { if (dbReady && dataLoaded) debouncedSave('users', () => db_saveUsers(users)); }, [users, dbReady, dataLoaded, debouncedSave]);
-  useEffect(() => { if (dbReady && dataLoaded) debouncedSave('settings', () => db_saveSettings(settings)); }, [settings, dbReady, dataLoaded, debouncedSave]);
+  // Save effects — only fire when savingEnabled is true
+  useEffect(() => { debouncedSave('properties', () => db_saveProperties(properties)); }, [properties, debouncedSave]);
+  useEffect(() => { debouncedSave('tenants', () => db_saveTenants(tenants)); }, [tenants, debouncedSave]);
+  useEffect(() => { debouncedSave('payments', () => db_savePayments(payments)); }, [payments, debouncedSave]);
+  useEffect(() => { debouncedSave('maintenance', () => db_saveMaintenance(maintenance)); }, [maintenance, debouncedSave]);
+  useEffect(() => { debouncedSave('expenses', () => db_saveExpenses(expenses)); }, [expenses, debouncedSave]);
+  useEffect(() => { debouncedSave('reminders', () => db_saveReminders(reminders)); }, [reminders, debouncedSave]);
+  useEffect(() => { debouncedSave('bills', () => db_saveBills(bills)); }, [bills, debouncedSave]);
+  useEffect(() => { debouncedSave('users', () => db_saveUsers(users)); }, [users, debouncedSave]);
+  useEffect(() => { debouncedSave('settings', () => db_saveSettings(settings)); }, [settings, debouncedSave]);
 
-  const handleLogin = (user: AuthUser) => {
-    setCurrentUser(user);
-    setIsAuthenticated(true);
-    setDataLoaded(false); // Trigger data load
-  };
+  const handleLogin = (user: AuthUser) => { setCurrentUser(user); setIsAuthenticated(true); };
 
   const handleLogout = async () => {
+    savingEnabled.current = false;
     await signOut();
-    setCurrentUser(null);
-    setIsAuthenticated(false);
-    setDbReady(false);
-    setDataLoaded(false);
-    setActiveTab('dashboard');
-    // Clear all data
-    setProperties([]);
-    setTenants([]);
-    setPayments([]);
-    setMaintenance([]);
-    setExpenses([]);
-    setReminders([]);
-    setBills([]);
-    setUsers([]);
-    setSettings(initialSettings);
+    setCurrentUser(null); setIsAuthenticated(false); setActiveTab('dashboard');
+    setProperties([]); setTenants([]); setPayments([]); setMaintenance([]);
+    setExpenses([]); setReminders([]); setBills([]); setUsers([]); setSettings(initialSettings);
   };
 
-  const toggleSection = (key: string) => {
-    setExpandedSections(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
-  };
+  const toggleSection = (key: string) => { setExpandedSections(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]); };
 
   const navigate = (tab: TabKey, subTab?: SubTab) => {
-    setActiveTab(tab);
-    setActiveSubTab(subTab || null);
-    setSidebarOpen(false);
+    setActiveTab(tab); setActiveSubTab(subTab || null); setSidebarOpen(false);
     if (subTab === 'add-tenant') { setShowAddTenant(true); setTenantFilter('active'); }
     else if (subTab === 'tenant') { setShowAddTenant(false); setTenantFilter('active'); }
     else if (subTab === 'old-tenants') { setShowAddTenant(false); setTenantFilter('old'); }
@@ -236,9 +170,9 @@ function App() {
     switch (activeTab) {
       case 'dashboard': return <Dashboard properties={properties} tenants={tenants} payments={payments} maintenance={maintenance} />;
       case 'properties': return <Properties properties={properties} setProperties={setProperties} tenants={tenants} />;
-      case 'tenants': return <Tenants tenants={tenants} setTenants={setTenants} properties={properties} bills={bills} setBills={setBills} payments={payments} settings={settings} showAddModal={showAddTenant} setShowAddModal={setShowAddTenant} filterType={tenantFilter} />;
-      case 'rent': return <RentCollection payments={payments} setPayments={setPayments} tenants={tenants} properties={properties} expenses={expenses} setExpenses={setExpenses} activeSubTab={activeSubTab as 'dues' | 'collection' | 'expense' | null} />;
-      case 'passbook': return <Passbook payments={payments} expenses={expenses} bills={bills} tenants={tenants} properties={properties} />;
+      case 'tenants': return <Tenants tenants={tenants} setTenants={setTenants} properties={properties} bills={bills} setBills={setBills} payments={payments} setPayments={setPayments} settings={settings} showAddModal={showAddTenant} setShowAddModal={setShowAddTenant} filterType={tenantFilter} onToast={addToast} />;
+      case 'rent': return <RentCollection payments={payments} setPayments={setPayments} tenants={tenants} properties={properties} expenses={expenses} setExpenses={setExpenses} bills={bills} setBills={setBills} activeSubTab={activeSubTab as 'dues' | 'collection' | 'expense' | null} onToast={addToast} />;
+      case 'passbook': return <Passbook payments={payments} expenses={expenses} setExpenses={setExpenses} bills={bills} tenants={tenants} properties={properties} onToast={addToast} />;
       case 'maintenance': return <Maintenance requests={maintenance} setRequests={setMaintenance} properties={properties} tenants={tenants} />;
       case 'reports': return <Reports expenses={expenses} setExpenses={setExpenses} properties={properties} payments={payments} tenants={tenants} bills={bills} />;
       case 'reminders': return <Reminders reminders={reminders} setReminders={setReminders} tenants={tenants} />;
@@ -259,44 +193,30 @@ function App() {
   const pendingRemindersCount = reminders.filter(r => r.status === 'Pending').length;
   const activeTenantsCount = tenants.filter(t => t.status === 'Active').length;
   const oldTenantsCount = tenants.filter(t => t.status === 'Inactive').length;
+  const isSynced = savingEnabled.current;
 
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-900 to-slate-900 flex items-center justify-center">
         <div className="text-center">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl shadow-lg shadow-indigo-500/30 mb-4">
-            <Loader2 className="w-8 h-8 text-white animate-spin" />
-          </div>
-          <h1 className="text-2xl font-bold text-white">RentFlow</h1>
-          <p className="text-slate-400 mt-2">Loading...</p>
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl shadow-lg shadow-indigo-500/30 mb-4"><Loader2 className="w-8 h-8 text-white animate-spin" /></div>
+          <h1 className="text-2xl font-bold text-white">RentFlow</h1><p className="text-slate-400 mt-2">Loading...</p>
         </div>
       </div>
     );
   }
 
-  if (!isAuthenticated) {
-    return <Login onLogin={handleLogin} />;
-  }
+  if (!isAuthenticated) return <Login onLogin={handleLogin} />;
 
   return (
     <div className="min-h-screen bg-gray-50/80 flex">
       {sidebarOpen && <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />}
-
-      {/* Sidebar */}
       <aside className={`fixed lg:static inset-y-0 left-0 z-50 w-72 bg-gradient-to-b from-slate-900 to-slate-800 transform transition-transform duration-300 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 flex flex-col shadow-2xl`}>
         <div className="h-16 flex items-center gap-3 px-5 border-b border-white/10 shrink-0">
-          <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/30">
-            <Home className="w-5 h-5 text-white" />
-          </div>
-          <div>
-            <h1 className="text-lg font-bold text-white">RentFlow</h1>
-            <p className="text-[10px] text-slate-400 -mt-0.5 tracking-wide">Property Management</p>
-          </div>
-          <button onClick={() => setSidebarOpen(false)} className="lg:hidden ml-auto p-1.5 hover:bg-white/10 rounded-lg">
-            <X className="w-5 h-5 text-slate-400" />
-          </button>
+          <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/30"><Home className="w-5 h-5 text-white" /></div>
+          <div><h1 className="text-lg font-bold text-white">RentFlow</h1><p className="text-[10px] text-slate-400 -mt-0.5 tracking-wide">Property Management</p></div>
+          <button onClick={() => setSidebarOpen(false)} className="lg:hidden ml-auto p-1.5 hover:bg-white/10 rounded-lg"><X className="w-5 h-5 text-slate-400" /></button>
         </div>
-
         <nav className="flex-1 py-4 px-3 space-y-1.5 overflow-y-auto">
           {NAV_SECTIONS.map(section => {
             const isExpanded = expandedSections.includes(section.key);
@@ -304,13 +224,9 @@ function App() {
             const hasChildren = section.children && section.children.length > 0;
             return (
               <div key={section.key}>
-                <button
-                  onClick={() => { if (hasChildren) toggleSection(section.key); else if (section.tab) navigate(section.tab); }}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${isActive && !hasChildren ? 'bg-gradient-to-r from-indigo-600 to-indigo-500 text-white shadow-lg shadow-indigo-500/30' : isActive && hasChildren ? 'bg-white/10 text-white' : 'text-slate-300 hover:bg-white/5 hover:text-white'}`}
-                >
-                  <div className={`p-1.5 rounded-lg ${isActive ? 'bg-white/20' : 'bg-white/5'}`}>
-                    <section.icon className="w-4 h-4" />
-                  </div>
+                <button onClick={() => { if (hasChildren) toggleSection(section.key); else if (section.tab) navigate(section.tab); }}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${isActive && !hasChildren ? 'bg-gradient-to-r from-indigo-600 to-indigo-500 text-white shadow-lg shadow-indigo-500/30' : isActive && hasChildren ? 'bg-white/10 text-white' : 'text-slate-300 hover:bg-white/5 hover:text-white'}`}>
+                  <div className={`p-1.5 rounded-lg ${isActive ? 'bg-white/20' : 'bg-white/5'}`}><section.icon className="w-4 h-4" /></div>
                   <span className="flex-1 text-left">{section.label}</span>
                   {section.key === 'maintenance' && openMaintenanceCount > 0 && <span className="bg-red-500 text-white text-[10px] font-bold min-w-[20px] h-5 px-1.5 rounded-full flex items-center justify-center">{openMaintenanceCount}</span>}
                   {section.key === 'reminders' && pendingRemindersCount > 0 && <span className="bg-orange-500 text-white text-[10px] font-bold min-w-[20px] h-5 px-1.5 rounded-full flex items-center justify-center">{pendingRemindersCount}</span>}
@@ -339,34 +255,24 @@ function App() {
             );
           })}
         </nav>
-
         <div className="p-4 border-t border-white/10 shrink-0">
           <div className="flex items-center gap-3 p-3 bg-white/5 rounded-xl">
-            <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-lg">
-              {currentUser?.name.charAt(0).toUpperCase() || 'U'}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-white truncate">{currentUser?.name || 'User'}</p>
-              <p className="text-xs text-slate-400 truncate">{currentUser?.role || 'Staff'}</p>
-            </div>
-            {!dbReady && <Loader2 className="w-4 h-4 text-indigo-400 animate-spin shrink-0" />}
+            <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-lg">{currentUser?.name.charAt(0).toUpperCase() || 'U'}</div>
+            <div className="min-w-0 flex-1"><p className="text-sm font-semibold text-white truncate">{currentUser?.name || 'User'}</p><p className="text-xs text-slate-400 truncate">{currentUser?.role || 'Staff'}</p></div>
           </div>
         </div>
       </aside>
-
-      {/* Main */}
       <div className="flex-1 flex flex-col min-w-0">
         <header className="h-16 bg-white border-b border-gray-200 flex items-center px-4 lg:px-6 shrink-0 sticky top-0 z-30 shadow-sm">
-          <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-2 -ml-1 hover:bg-gray-100 rounded-xl mr-3">
-            <Menu className="w-5 h-5 text-gray-600" />
-          </button>
+          <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-2 -ml-1 hover:bg-gray-100 rounded-xl mr-3"><Menu className="w-5 h-5 text-gray-600" /></button>
           <h2 className="text-lg font-semibold text-gray-900">{getPageTitle()}</h2>
           <div className="ml-auto flex items-center gap-3">
-            {dbReady && <div className="hidden sm:flex items-center gap-2 text-xs text-gray-400 bg-gray-50 px-3 py-1.5 rounded-full"><div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" /> {currentUser?.name} • Synced</div>}
-            {!dbReady && <div className="hidden sm:flex items-center gap-2 text-xs text-gray-400 bg-gray-50 px-3 py-1.5 rounded-full"><Loader2 className="w-3 h-3 animate-spin" /> Syncing...</div>}
+            <div className="hidden sm:flex items-center gap-2 text-xs text-gray-400 bg-gray-50 px-3 py-1.5 rounded-full">
+              <div className={`w-2 h-2 rounded-full ${isSynced ? 'bg-green-500 animate-pulse' : 'bg-yellow-500'}`} />
+              {currentUser?.name} • {isSynced ? 'Synced' : 'Loading...'}
+            </div>
           </div>
         </header>
-
         <main className="flex-1 p-4 lg:p-6 overflow-y-auto">
           {renderContent()}
           <footer className="mt-12 pb-4 text-center border-t border-gray-200 pt-6">
@@ -375,6 +281,7 @@ function App() {
           </footer>
         </main>
       </div>
+      <Toast toasts={toasts} removeToast={removeToast} />
     </div>
   );
 }

@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import { RentPayment, Expense, TenantBill, Tenant, Property } from '../types';
+import { generateId } from '../data';
 import { formatDate, formatCurrency } from '../utils/helpers';
-import { Download, FileSpreadsheet, FileText, Calendar, TrendingUp, TrendingDown, Wallet, ArrowUpCircle, ArrowDownCircle, X, Search } from 'lucide-react';
+import { Download, FileSpreadsheet, FileText, Calendar, TrendingUp, TrendingDown, Wallet, ArrowUpCircle, ArrowDownCircle, X, Search, Plus, Trash2 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
@@ -9,9 +10,11 @@ import * as XLSX from 'xlsx';
 interface Props {
   payments: RentPayment[];
   expenses: Expense[];
+  setExpenses: (e: Expense[]) => void;
   bills: TenantBill[];
   tenants: Tenant[];
   properties: Property[];
+  onToast: (text: string, type?: 'success' | 'error' | 'info') => void;
 }
 
 interface LedgerEntry {
@@ -27,11 +30,37 @@ interface LedgerEntry {
   tenant?: string;
 }
 
-export default function Passbook({ payments, expenses, bills, tenants, properties }: Props) {
+export default function Passbook({ payments, expenses, setExpenses, bills, tenants, properties, onToast }: Props) {
   const [showExport, setShowExport] = useState(false);
+  const [showAddEntry, setShowAddEntry] = useState(false);
   const [filterType, setFilterType] = useState<'All' | 'Income' | 'Expense'>('All');
   const [filterMonth, setFilterMonth] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [manualEntry, setManualEntry] = useState({ type: 'Income' as 'Income' | 'Expense', category: '', description: '', amount: 0, date: new Date().toISOString().split('T')[0], propertyId: '' });
+
+  const addManualEntry = () => {
+    if (!manualEntry.description.trim() || manualEntry.amount <= 0) { onToast('Enter description and amount', 'error'); return; }
+    const prop = properties.find(p => p.id === manualEntry.propertyId);
+    if (manualEntry.type === 'Expense') {
+      setExpenses([...expenses, { id: generateId(), propertyId: manualEntry.propertyId, propertyName: prop?.name || 'General', category: manualEntry.category || 'Other', amount: manualEntry.amount, date: manualEntry.date, description: manualEntry.description }]);
+    } else {
+      // For income, add as a generic expense with negative amount won't work — we add as a paid payment
+      setExpenses([...expenses, { id: generateId(), propertyId: manualEntry.propertyId, propertyName: prop?.name || 'General', category: `Income: ${manualEntry.category || 'Other'}`, amount: -manualEntry.amount, date: manualEntry.date, description: `[INCOME] ${manualEntry.description}` }]);
+    }
+    onToast(`Entry added to passbook`);
+    setShowAddEntry(false);
+    setManualEntry({ type: 'Income', category: '', description: '', amount: 0, date: new Date().toISOString().split('T')[0], propertyId: '' });
+  };
+
+  const deleteEntry = (entry: LedgerEntry) => {
+    if (entry.source === 'Expense') {
+      const expId = entry.id.replace('exp-', '');
+      setExpenses(expenses.filter(e => e.id !== expId));
+      onToast('Entry removed from passbook');
+    } else {
+      onToast('Can only delete expense entries. Rent & bill entries are managed from Tenants page.', 'info');
+    }
+  };
 
   // Build ledger from ALL sources automatically
   const ledger = useMemo((): LedgerEntry[] => {
@@ -168,7 +197,10 @@ export default function Passbook({ payments, expenses, bills, tenants, propertie
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div><h1 className="text-2xl font-bold text-gray-900">Passbook</h1><p className="text-gray-500 text-sm mt-1">Complete financial history • Auto-records all transactions</p></div>
-        <button onClick={() => setShowExport(true)} className="flex items-center gap-2 bg-green-600 text-white px-4 py-2.5 rounded-xl hover:bg-green-700 transition font-medium text-sm shadow-sm"><Download className="w-4 h-4" /> Export Report</button>
+        <div className="flex gap-2">
+          <button onClick={() => setShowAddEntry(true)} className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2.5 rounded-xl hover:bg-indigo-700 transition font-medium text-sm shadow-sm"><Plus className="w-4 h-4" /> Add Entry</button>
+          <button onClick={() => setShowExport(true)} className="flex items-center gap-2 bg-green-600 text-white px-4 py-2.5 rounded-xl hover:bg-green-700 transition font-medium text-sm shadow-sm"><Download className="w-4 h-4" /> Export</button>
+        </div>
       </div>
 
       {/* KPI Cards */}
@@ -225,9 +257,14 @@ export default function Passbook({ payments, expenses, bills, tenants, propertie
                   <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-500 font-medium">{entry.source}</span>
                 </div>
               </div>
-              <div className="text-right shrink-0">
-                <p className={`text-sm font-bold ${entry.type === 'Income' ? 'text-green-600' : 'text-red-600'}`}>{entry.type === 'Income' ? '+' : '-'}{formatCurrency(entry.amount)}</p>
-                <p className={`text-xs ${entry.balance >= 0 ? 'text-gray-500' : 'text-orange-500'}`}>Bal: {formatCurrency(entry.balance)}</p>
+              <div className="text-right shrink-0 flex items-center gap-2">
+                <div>
+                  <p className={`text-sm font-bold ${entry.type === 'Income' ? 'text-green-600' : 'text-red-600'}`}>{entry.type === 'Income' ? '+' : '-'}{formatCurrency(entry.amount)}</p>
+                  <p className={`text-xs ${entry.balance >= 0 ? 'text-gray-500' : 'text-orange-500'}`}>Bal: {formatCurrency(entry.balance)}</p>
+                </div>
+                {entry.source === 'Expense' && (
+                  <button onClick={() => deleteEntry(entry)} className="p-1 rounded hover:bg-red-50 text-gray-300 hover:text-red-500 transition" title="Delete"><Trash2 className="w-3.5 h-3.5" /></button>
+                )}
               </div>
             </div>
           ))}
@@ -262,6 +299,30 @@ export default function Passbook({ payments, expenses, bills, tenants, propertie
             <div className="space-y-3">
               <button onClick={() => { exportPDF(); setShowExport(false); }} className="w-full flex items-center gap-3 p-4 rounded-xl border-2 border-gray-200 hover:border-red-400 hover:bg-red-50 transition"><FileText className="w-8 h-8 text-red-600" /><div><p className="font-medium text-gray-900">PDF Report</p><p className="text-xs text-gray-500">P&L + all transactions</p></div></button>
               <button onClick={() => { exportExcel(); setShowExport(false); }} className="w-full flex items-center gap-3 p-4 rounded-xl border-2 border-gray-200 hover:border-green-400 hover:bg-green-50 transition"><FileSpreadsheet className="w-8 h-8 text-green-600" /><div><p className="font-medium text-gray-900">Excel Spreadsheet</p><p className="text-xs text-gray-500">Full data with formulas</p></div></button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Manual Entry Modal */}
+      {showAddEntry && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => setShowAddEntry(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-5"><h2 className="text-xl font-bold">Add Passbook Entry</h2><button onClick={() => setShowAddEntry(false)} className="p-1 hover:bg-gray-100 rounded-lg"><X className="w-5 h-5" /></button></div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Type</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button onClick={() => setManualEntry({ ...manualEntry, type: 'Income' })} className={`flex items-center justify-center gap-2 p-3 rounded-xl border-2 font-medium transition ${manualEntry.type === 'Income' ? 'border-green-500 bg-green-50 text-green-700' : 'border-gray-200 text-gray-600'}`}><ArrowUpCircle className="w-5 h-5" /> Income</button>
+                  <button onClick={() => setManualEntry({ ...manualEntry, type: 'Expense' })} className={`flex items-center justify-center gap-2 p-3 rounded-xl border-2 font-medium transition ${manualEntry.type === 'Expense' ? 'border-red-500 bg-red-50 text-red-700' : 'border-gray-200 text-gray-600'}`}><ArrowDownCircle className="w-5 h-5" /> Expense</button>
+                </div>
+              </div>
+              <div><label className="block text-sm font-medium text-gray-700 mb-1">Category</label><input value={manualEntry.category} onChange={e => setManualEntry({ ...manualEntry, category: e.target.value })} className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none" placeholder="e.g., Rent, Repairs, Deposit" /></div>
+              <div><label className="block text-sm font-medium text-gray-700 mb-1">Description*</label><input value={manualEntry.description} onChange={e => setManualEntry({ ...manualEntry, description: e.target.value })} className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none" placeholder="Describe the transaction" /></div>
+              <div><label className="block text-sm font-medium text-gray-700 mb-1">Amount (₹)</label><input type="number" value={manualEntry.amount} onChange={e => setManualEntry({ ...manualEntry, amount: +e.target.value })} className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none" /></div>
+              <div><label className="block text-sm font-medium text-gray-700 mb-1">Date</label><input type="date" value={manualEntry.date} onChange={e => setManualEntry({ ...manualEntry, date: e.target.value })} className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none" /></div>
+              <div><label className="block text-sm font-medium text-gray-700 mb-1">Property (optional)</label><select value={manualEntry.propertyId} onChange={e => setManualEntry({ ...manualEntry, propertyId: e.target.value })} className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"><option value="">General</option>{properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
+              <div className="flex gap-3 pt-2"><button onClick={() => setShowAddEntry(false)} className="flex-1 border border-gray-200 text-gray-700 py-2.5 rounded-xl font-medium text-sm hover:bg-gray-50 transition">Cancel</button><button onClick={addManualEntry} className="flex-1 bg-indigo-600 text-white py-2.5 rounded-xl font-medium text-sm hover:bg-indigo-700 transition">Add Entry</button></div>
             </div>
           </div>
         </div>

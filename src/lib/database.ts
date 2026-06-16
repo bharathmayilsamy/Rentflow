@@ -36,24 +36,23 @@ export const db_saveProperties = async (properties: Property[]) => {
   const userId = await getUserId();
   if (!userId) return;
 
-  // Delete all existing, then re-insert
-  await supabase.from('properties').delete().eq('user_id', userId);
+  // Use upsert for existing, then delete removed ones
+  if (properties.length > 0) {
+    const rows = properties.map(p => ({
+      id: p.id, user_id: userId, name: p.name, type: p.type, address: p.address,
+      total_rooms: p.totalRooms, occupied_rooms: p.occupiedRooms, monthly_rent: p.monthlyRent,
+    }));
+    const { error } = await supabase.from('properties').upsert(rows);
+    if (error) console.error('Save properties error:', error);
+  }
 
-  if (properties.length === 0) return;
-
-  const rows = properties.map(p => ({
-    id: p.id,
-    user_id: userId,
-    name: p.name,
-    type: p.type,
-    address: p.address,
-    total_rooms: p.totalRooms,
-    occupied_rooms: p.occupiedRooms,
-    monthly_rent: p.monthlyRent,
-  }));
-
-  const { error } = await supabase.from('properties').upsert(rows);
-  if (error) console.error('Save properties error:', error);
+  // Delete rows that no longer exist
+  const ids = properties.map(p => p.id);
+  const { data: existing } = await supabase.from('properties').select('id').eq('user_id', userId);
+  const toDelete = (existing || []).filter((r: any) => !ids.includes(r.id)).map((r: any) => r.id);
+  if (toDelete.length > 0) {
+    await supabase.from('properties').delete().in('id', toDelete);
+  }
 };
 
 // ============================================
@@ -82,6 +81,9 @@ export const db_loadTenants = async (): Promise<Tenant[] | null> => {
     status: r.status || 'Active',
     avatarColor: r.avatar_color || '#6366f1',
     dueDay: r.due_day || 1,
+    ebConsumerNo: r.eb_consumer_no || '',
+    waterBillNo: r.water_bill_no || '',
+    propertyTaxNo: r.property_tax_no || '',
   })) || null;
 };
 
@@ -89,31 +91,26 @@ export const db_saveTenants = async (tenants: Tenant[]) => {
   const userId = await getUserId();
   if (!userId) return;
 
-  await supabase.from('tenants').delete().eq('user_id', userId);
-  if (tenants.length === 0) return;
+  if (tenants.length > 0) {
+    const rows = tenants.map(t => ({
+      id: t.id, user_id: userId, name: t.name, email: t.email, phone: t.phone,
+      property_id: t.propertyId, room: t.room, rent: t.rent, deposit: t.deposit,
+      lease_start: t.leaseStart, lease_end: t.leaseEnd, id_proof: t.idProof,
+      emergency_contact: t.emergencyContact, notes: t.notes, status: t.status,
+      avatar_color: t.avatarColor, due_day: t.dueDay || 1,
+      eb_consumer_no: t.ebConsumerNo || '', water_bill_no: t.waterBillNo || '', property_tax_no: t.propertyTaxNo || '',
+    }));
+    const { error } = await supabase.from('tenants').upsert(rows);
+    if (error) console.error('Save tenants error:', error);
+  }
 
-  const rows = tenants.map(t => ({
-    id: t.id,
-    user_id: userId,
-    name: t.name,
-    email: t.email,
-    phone: t.phone,
-    property_id: t.propertyId,
-    room: t.room,
-    rent: t.rent,
-    deposit: t.deposit,
-    lease_start: t.leaseStart,
-    lease_end: t.leaseEnd,
-    id_proof: t.idProof,
-    emergency_contact: t.emergencyContact,
-    notes: t.notes,
-    status: t.status,
-    avatar_color: t.avatarColor,
-    due_day: t.dueDay || 1,
-  }));
-
-  const { error } = await supabase.from('tenants').upsert(rows);
-  if (error) console.error('Save tenants error:', error);
+  // Only delete tenants that were actually removed (not all of them!)
+  const ids = tenants.map(t => t.id);
+  const { data: existing } = await supabase.from('tenants').select('id').eq('user_id', userId);
+  const toDelete = (existing || []).filter((r: any) => !ids.includes(r.id)).map((r: any) => r.id);
+  if (toDelete.length > 0) {
+    await supabase.from('tenants').delete().in('id', toDelete);
+  }
 };
 
 // ============================================
@@ -144,28 +141,15 @@ export const db_loadPayments = async (): Promise<RentPayment[] | null> => {
 export const db_savePayments = async (payments: RentPayment[]) => {
   const userId = await getUserId();
   if (!userId) return;
-
-  await supabase.from('rent_payments').delete().eq('user_id', userId);
-  if (payments.length === 0) return;
-
-  const rows = payments.map(p => ({
-    id: p.id,
-    user_id: userId,
-    tenant_id: p.tenantId,
-    tenant_name: p.tenantName,
-    property_id: p.propertyId,
-    room: p.room,
-    amount: p.amount,
-    due_amount: p.dueAmount,
-    method: p.method,
-    status: p.status,
-    date: p.date,
-    due_date: p.dueDate,
-    receipt_no: p.receiptNo,
-  }));
-
-  const { error } = await supabase.from('rent_payments').upsert(rows);
-  if (error) console.error('Save payments error:', error);
+  if (payments.length > 0) {
+    const rows = payments.map(p => ({ id: p.id, user_id: userId, tenant_id: p.tenantId, tenant_name: p.tenantName, property_id: p.propertyId, room: p.room, amount: p.amount, due_amount: p.dueAmount, method: p.method, status: p.status, date: p.date, due_date: p.dueDate, receipt_no: p.receiptNo }));
+    const { error } = await supabase.from('rent_payments').upsert(rows);
+    if (error) console.error('Save payments error:', error);
+  }
+  const ids = payments.map(p => p.id);
+  const { data: existing } = await supabase.from('rent_payments').select('id').eq('user_id', userId);
+  const toDelete = (existing || []).filter((r: any) => !ids.includes(r.id)).map((r: any) => r.id);
+  if (toDelete.length > 0) await supabase.from('rent_payments').delete().in('id', toDelete);
 };
 
 // ============================================
@@ -197,29 +181,15 @@ export const db_loadMaintenance = async (): Promise<MaintenanceRequest[] | null>
 export const db_saveMaintenance = async (items: MaintenanceRequest[]) => {
   const userId = await getUserId();
   if (!userId) return;
-
-  await supabase.from('maintenance_requests').delete().eq('user_id', userId);
-  if (items.length === 0) return;
-
-  const rows = items.map(m => ({
-    id: m.id,
-    user_id: userId,
-    tenant_id: m.tenantId,
-    tenant_name: m.tenantName,
-    property_id: m.propertyId,
-    property_name: m.propertyName,
-    room: m.room,
-    category: m.category,
-    priority: m.priority,
-    status: m.status,
-    description: m.description,
-    repair_cost: m.repairCost,
-    created_date: m.createdDate,
-    resolved_date: m.resolvedDate || null,
-  }));
-
-  const { error } = await supabase.from('maintenance_requests').upsert(rows);
-  if (error) console.error('Save maintenance error:', error);
+  if (items.length > 0) {
+    const rows = items.map(m => ({ id: m.id, user_id: userId, tenant_id: m.tenantId, tenant_name: m.tenantName, property_id: m.propertyId, property_name: m.propertyName, room: m.room, category: m.category, priority: m.priority, status: m.status, description: m.description, repair_cost: m.repairCost, created_date: m.createdDate, resolved_date: m.resolvedDate || null }));
+    const { error } = await supabase.from('maintenance_requests').upsert(rows);
+    if (error) console.error('Save maintenance error:', error);
+  }
+  const ids = items.map(i => i.id);
+  const { data: existing } = await supabase.from('maintenance_requests').select('id').eq('user_id', userId);
+  const toDelete = (existing || []).filter((r: any) => !ids.includes(r.id)).map((r: any) => r.id);
+  if (toDelete.length > 0) await supabase.from('maintenance_requests').delete().in('id', toDelete);
 };
 
 // ============================================
@@ -245,23 +215,15 @@ export const db_loadExpenses = async (): Promise<Expense[] | null> => {
 export const db_saveExpenses = async (items: Expense[]) => {
   const userId = await getUserId();
   if (!userId) return;
-
-  await supabase.from('expenses').delete().eq('user_id', userId);
-  if (items.length === 0) return;
-
-  const rows = items.map(e => ({
-    id: e.id,
-    user_id: userId,
-    property_id: e.propertyId,
-    property_name: e.propertyName,
-    category: e.category,
-    amount: e.amount,
-    date: e.date,
-    description: e.description,
-  }));
-
-  const { error } = await supabase.from('expenses').upsert(rows);
-  if (error) console.error('Save expenses error:', error);
+  if (items.length > 0) {
+    const rows = items.map(e => ({ id: e.id, user_id: userId, property_id: e.propertyId, property_name: e.propertyName, category: e.category, amount: e.amount, date: e.date, description: e.description }));
+    const { error } = await supabase.from('expenses').upsert(rows);
+    if (error) console.error('Save expenses error:', error);
+  }
+  const ids = items.map(i => i.id);
+  const { data: existing } = await supabase.from('expenses').select('id').eq('user_id', userId);
+  const toDelete = (existing || []).filter((r: any) => !ids.includes(r.id)).map((r: any) => r.id);
+  if (toDelete.length > 0) await supabase.from('expenses').delete().in('id', toDelete);
 };
 
 // ============================================
@@ -288,24 +250,15 @@ export const db_loadReminders = async (): Promise<Reminder[] | null> => {
 export const db_saveReminders = async (items: Reminder[]) => {
   const userId = await getUserId();
   if (!userId) return;
-
-  await supabase.from('reminders').delete().eq('user_id', userId);
-  if (items.length === 0) return;
-
-  const rows = items.map(r => ({
-    id: r.id,
-    user_id: userId,
-    tenant_id: r.tenantId,
-    tenant_name: r.tenantName,
-    type: r.type,
-    channel: r.channel,
-    message: r.message,
-    scheduled_date: r.scheduledDate,
-    status: r.status,
-  }));
-
-  const { error } = await supabase.from('reminders').upsert(rows);
-  if (error) console.error('Save reminders error:', error);
+  if (items.length > 0) {
+    const rows = items.map(r => ({ id: r.id, user_id: userId, tenant_id: r.tenantId, tenant_name: r.tenantName, type: r.type, channel: r.channel, message: r.message, scheduled_date: r.scheduledDate, status: r.status }));
+    const { error } = await supabase.from('reminders').upsert(rows);
+    if (error) console.error('Save reminders error:', error);
+  }
+  const ids = items.map(i => i.id);
+  const { data: existing } = await supabase.from('reminders').select('id').eq('user_id', userId);
+  const toDelete = (existing || []).filter((r: any) => !ids.includes(r.id)).map((r: any) => r.id);
+  if (toDelete.length > 0) await supabase.from('reminders').delete().in('id', toDelete);
 };
 
 // ============================================
@@ -332,24 +285,15 @@ export const db_loadBills = async (): Promise<TenantBill[] | null> => {
 export const db_saveBills = async (items: TenantBill[]) => {
   const userId = await getUserId();
   if (!userId) return;
-
-  await supabase.from('tenant_bills').delete().eq('user_id', userId);
-  if (items.length === 0) return;
-
-  const rows = items.map(b => ({
-    id: b.id,
-    user_id: userId,
-    tenant_id: b.tenantId,
-    type: b.type,
-    description: b.description,
-    amount: b.amount,
-    due_date: b.dueDate,
-    paid_date: b.paidDate || null,
-    status: b.status,
-  }));
-
-  const { error } = await supabase.from('tenant_bills').upsert(rows);
-  if (error) console.error('Save bills error:', error);
+  if (items.length > 0) {
+    const rows = items.map(b => ({ id: b.id, user_id: userId, tenant_id: b.tenantId, type: b.type, description: b.description, amount: b.amount, due_date: b.dueDate, paid_date: b.paidDate || null, status: b.status }));
+    const { error } = await supabase.from('tenant_bills').upsert(rows);
+    if (error) console.error('Save bills error:', error);
+  }
+  const ids = items.map(i => i.id);
+  const { data: existing } = await supabase.from('tenant_bills').select('id').eq('user_id', userId);
+  const toDelete = (existing || []).filter((r: any) => !ids.includes(r.id)).map((r: any) => r.id);
+  if (toDelete.length > 0) await supabase.from('tenant_bills').delete().in('id', toDelete);
 };
 
 // ============================================
@@ -429,25 +373,15 @@ export const db_loadUsers = async (): Promise<User[] | null> => {
 export const db_saveUsers = async (items: User[]) => {
   const userId = await getUserId();
   if (!userId) return;
-
-  await supabase.from('app_users').delete().eq('user_id', userId);
-  if (items.length === 0) return;
-
-  const rows = items.map(u => ({
-    id: u.id,
-    user_id: userId,
-    name: u.name,
-    email: u.email,
-    phone: u.phone,
-    role: u.role,
-    avatar: u.avatar,
-    is_active: u.isActive,
-    created_at_date: u.createdAt,
-    last_login: u.lastLogin || null,
-  }));
-
-  const { error } = await supabase.from('app_users').upsert(rows);
-  if (error) console.error('Save users error:', error);
+  if (items.length > 0) {
+    const rows = items.map(u => ({ id: u.id, user_id: userId, name: u.name, email: u.email, phone: u.phone, role: u.role, avatar: u.avatar, is_active: u.isActive, created_at_date: u.createdAt, last_login: u.lastLogin || null }));
+    const { error } = await supabase.from('app_users').upsert(rows);
+    if (error) console.error('Save users error:', error);
+  }
+  const ids = items.map(i => i.id);
+  const { data: existing } = await supabase.from('app_users').select('id').eq('user_id', userId);
+  const toDelete = (existing || []).filter((r: any) => !ids.includes(r.id)).map((r: any) => r.id);
+  if (toDelete.length > 0) await supabase.from('app_users').delete().in('id', toDelete);
 };
 
 // ============================================

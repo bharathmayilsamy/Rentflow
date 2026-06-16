@@ -29,7 +29,10 @@ export interface Tenant {
   notes: string;
   status: TenantStatus;
   avatarColor: string;
-  dueDay: number; // Day of month rent is due (1-31)
+  dueDay: number;
+  ebConsumerNo: string;
+  waterBillNo: string;
+  propertyTaxNo: string;
 }
 
 export type PaymentMethod = 'UPI' | 'Cash' | 'Bank Transfer' | 'Card' | 'Cheque';
