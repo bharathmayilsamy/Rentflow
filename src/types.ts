@@ -33,6 +33,7 @@ export interface Tenant {
   ebConsumerNo: string;
   waterBillNo: string;
   propertyTaxNo: string;
+  isLocked: boolean;
 }
 
 export type PaymentMethod = 'UPI' | 'Cash' | 'Bank Transfer' | 'Card' | 'Cheque';

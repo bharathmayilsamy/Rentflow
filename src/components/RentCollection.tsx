@@ -218,9 +218,12 @@ export default function RentCollection({ payments, setPayments, tenants, propert
                       </div>
                       <div className="space-y-1">
                         {item.pendingBills.map(b => (
-                          <div key={b.id} className="flex items-center justify-between text-xs">
-                            <span className="text-gray-600">{b.type}: {b.description}</span>
-                            <span className="font-semibold text-orange-600">{formatCurrency(b.amount)}</span>
+                          <div key={b.id} className="flex items-center justify-between text-xs gap-3">
+                            <div className="min-w-0">
+                              <span className="text-gray-600 block truncate">{b.type}: {b.description}</span>
+                              <span className="text-[10px] text-gray-400">Due: {formatDate(b.dueDate)}</span>
+                            </div>
+                            <span className="font-semibold text-orange-600 shrink-0">{formatCurrency(b.amount)}</span>
                           </div>
                         ))}
                       </div>
