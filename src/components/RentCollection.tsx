@@ -300,8 +300,12 @@ export default function RentCollection({ payments, setPayments, tenants, propert
                 <p className="text-sm text-gray-500">Tenant: <span className="font-medium text-gray-900">{selectedPayment.tenantName}</span></p>
                 <p className="text-sm text-gray-500 mt-1">Balance Due: <span className="font-medium text-red-600">{formatCurrency(selectedPayment.dueAmount - selectedPayment.amount)}</span></p>
               </div>
-              <div><label className="block text-sm font-medium text-gray-700 mb-1">Payment Amount (₹)</label><input type="number" value={payAmount} onChange={e => setPayAmount(+e.target.value)} className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none" /></div>
-              <div><label className="block text-sm font-medium text-gray-700 mb-1">Payment Date</label><input type="date" value={payDate} onChange={e => setPayDate(e.target.value)} className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none" /></div>
+              <div className="p-3 bg-indigo-50 border border-indigo-100 rounded-xl">
+                <p className="text-xs font-semibold text-indigo-700">Record against payment date</p>
+                <p className="text-[11px] text-indigo-600 mt-0.5">Choose the exact date the tenant paid. This date will be saved in history.</p>
+              </div>
+              <div><label className="block text-sm font-medium text-gray-700 mb-1">Payment Date <span className="text-red-500">*</span></label><input type="date" value={payDate} onChange={e => setPayDate(e.target.value)} className="w-full border border-gray-200 rounded-xl px-4 py-3 text-base focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none" /></div>
+              <div><label className="block text-sm font-medium text-gray-700 mb-1">Payment Amount (₹)</label><input type="number" value={payAmount} onChange={e => setPayAmount(+e.target.value)} className="w-full border border-gray-200 rounded-xl px-4 py-3 text-base focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none" /></div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Payment Method</label>
                 <div className="grid grid-cols-3 gap-2">

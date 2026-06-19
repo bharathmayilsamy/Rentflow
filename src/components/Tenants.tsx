@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { Tenant, TenantStatus, Property, TenantBill, BillType, BillStatus, RentPayment, Settings } from '../types';
 import { generateId, getAvatarColor } from '../data';
 import { formatDate, formatCurrency, daysUntil, getOrdinal, getNextDueDateStr } from '../utils/helpers';
-import { Plus, Edit2, Trash2, Eye, Search, X, Phone, Calendar, Receipt, Zap, Droplets, Wifi, Flame, Wrench, FileText, CheckCircle, Building2, Clock, TrendingUp, AlertCircle, ArrowUpRight, ArrowDownRight, History, CircleDollarSign, Banknote, MinusCircle, FileDown, Lock, Unlock } from 'lucide-react';
+import { Plus, Edit2, Trash2, Eye, Search, X, Phone, Calendar, Receipt, Zap, Droplets, Wifi, Flame, Wrench, FileText, CheckCircle, Building2, Clock, TrendingUp, AlertCircle, ArrowUpRight, ArrowDownRight, History, CircleDollarSign, Banknote, MinusCircle, FileDown, Lock, Unlock, MessageCircle } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -220,7 +220,21 @@ export default function Tenants({ tenants, setTenants, properties, bills, setBil
 
                 <div className="space-y-1.5 mb-3">
                   <div className="flex items-center gap-2 text-sm"><Building2 className="w-3.5 h-3.5 text-indigo-500" /><span className="truncate">{getPropertyName(t.propertyId)}</span></div>
-                  {t.phone && <div className="flex items-center gap-2 text-sm text-gray-600"><Phone className="w-3.5 h-3.5 text-gray-400" />{t.phone}</div>}
+                  {t.phone && (
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <Phone className="w-3.5 h-3.5 text-gray-400" />
+                      <span>{t.phone}</span>
+                      <a
+                        href={`https://wa.me/${t.phone.replace(/\D/g, '')}?text=${encodeURIComponent(`Hello ${t.name}, regarding your rent and dues in RentFlow.`)}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="ml-auto inline-flex items-center justify-center w-8 h-8 rounded-full bg-green-50 text-green-600 hover:bg-green-100 transition"
+                        title="Message on WhatsApp"
+                      >
+                        <MessageCircle className="w-4 h-4" />
+                      </a>
+                    </div>
+                  )}
                 </div>
 
                 {hasOverdue ? (
@@ -244,7 +258,7 @@ export default function Tenants({ tenants, setTenants, properties, bills, setBil
                     <Calendar className="w-4 h-4 text-indigo-600 shrink-0" />
                     <div className="flex-1">
                       <p className="text-xs font-semibold text-indigo-700">Upcoming rent cycle</p>
-                      <p className="text-[10px] text-indigo-600">Rent due will be added on {formatDate(nextDueDate)} automatically</p>
+                      <p className="text-[10px] text-indigo-600">Scheduled rent due date: {formatDate(nextDueDate)}</p>
                     </div>
                   </div>
                 )}
@@ -272,13 +286,27 @@ export default function Tenants({ tenants, setTenants, properties, bills, setBil
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 mt-3 pt-2">
-                  <button onClick={() => addRentDue(t)} className="flex-1 flex items-center justify-center gap-1.5 text-xs bg-indigo-50 text-indigo-700 hover:bg-indigo-100 py-2 rounded-lg font-medium transition"><Banknote className="w-3.5 h-3.5" /> Add Rent</button>
-                  {stats.hasPendingDue && <button onClick={() => removeRentDue(t.id)} className="flex items-center justify-center text-xs bg-red-50 text-red-600 hover:bg-red-100 py-2 px-3 rounded-lg font-medium transition"><MinusCircle className="w-3.5 h-3.5" /></button>}
-                  <button onClick={() => openAddBill(t.id)} className="flex items-center justify-center text-xs bg-orange-50 text-orange-700 hover:bg-orange-100 py-2 px-3 rounded-lg font-medium transition"><Receipt className="w-3.5 h-3.5" /></button>
-                  <button onClick={() => { setShowDetail(t); setDetailTab('payments'); }} className="flex items-center justify-center text-xs bg-gray-100 text-gray-600 hover:bg-gray-200 py-2 px-3 rounded-lg font-medium transition"><History className="w-3.5 h-3.5" /></button>
-                  <button onClick={() => exportTenantPDF(t)} className="p-2 rounded-lg hover:bg-indigo-50 text-gray-300 hover:text-indigo-500 transition"><FileDown className="w-3.5 h-3.5" /></button>
-                  <button onClick={() => remove(t.id)} className="p-2 rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-500 transition"><Trash2 className="w-3.5 h-3.5" /></button>
+                <div className="flex flex-wrap gap-2 mt-3 pt-2">
+                  <button onClick={() => addRentDue(t)} className="flex-1 min-w-[120px] flex items-center justify-center gap-2 text-sm bg-indigo-50 text-indigo-700 hover:bg-indigo-100 py-2.5 px-3 rounded-xl font-bold transition border border-indigo-100">
+                    <Banknote className="w-4 h-4" /> Add Rent
+                  </button>
+                  {stats.hasPendingDue && (
+                    <button onClick={() => removeRentDue(t.id)} className="flex-1 min-w-[120px] flex items-center justify-center gap-2 text-sm bg-rose-50 text-rose-700 hover:bg-rose-100 py-2.5 px-3 rounded-xl font-bold transition border border-rose-100">
+                      <MinusCircle className="w-4 h-4" /> Remove Due
+                    </button>
+                  )}
+                  <button onClick={() => openAddBill(t.id)} className="flex-1 min-w-[120px] flex items-center justify-center gap-2 text-sm bg-orange-50 text-orange-700 hover:bg-orange-100 py-2.5 px-3 rounded-xl font-bold transition border border-orange-100">
+                    <Receipt className="w-4 h-4" /> Add Bill
+                  </button>
+                  <button onClick={() => { setShowDetail(t); setDetailTab('payments'); }} className="flex-1 min-w-[120px] flex items-center justify-center gap-2 text-sm bg-slate-100 text-slate-700 hover:bg-slate-200 py-2.5 px-3 rounded-xl font-bold transition border border-slate-200">
+                    <History className="w-4 h-4" /> History
+                  </button>
+                  <button onClick={() => exportTenantPDF(t)} className="flex items-center justify-center gap-2 text-sm bg-blue-50 text-blue-700 hover:bg-blue-100 py-2.5 px-3 rounded-xl font-bold transition border border-blue-100">
+                    <FileDown className="w-4 h-4" /> PDF
+                  </button>
+                  <button onClick={() => remove(t.id)} className="flex items-center justify-center gap-2 text-sm bg-red-50 text-red-700 hover:bg-red-100 py-2.5 px-3 rounded-xl font-bold transition border border-red-100">
+                    <Trash2 className="w-4 h-4" /> Delete
+                  </button>
                 </div>
               </div>
             </div>
