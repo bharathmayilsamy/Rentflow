@@ -13,10 +13,11 @@ import Reports from './components/Reports';
 import Reminders from './components/Reminders';
 import SettingsPage from './components/Settings';
 import Passbook from './components/Passbook';
+import ReportsCenter from './components/ReportsCenter';
 import Toast, { ToastMessage } from './components/Toast';
-import { LayoutDashboard, Building2, Users, Wallet, Wrench, Bell, Settings as SettingsIcon, Menu, X, Home, ChevronDown, UserPlus, UserCheck, UserX, Receipt, CreditCard, TrendingDown, BookOpen, Loader2 } from 'lucide-react';
+import { LayoutDashboard, Building2, Users, Wallet, Wrench, Bell, Settings as SettingsIcon, Menu, X, Home, ChevronDown, UserPlus, UserCheck, UserX, Receipt, CreditCard, TrendingDown, BookOpen, Loader2, FileBarChart } from 'lucide-react';
 
-type SubTab = 'dues' | 'collection' | 'expense' | 'tenant' | 'add-tenant' | 'old-tenants';
+type SubTab = 'dues' | 'collection' | 'expense' | 'tenant' | 'add-tenant' | 'old-tenants' | 'passbook-ledger' | 'passbook-reports';
 interface NavSection { key: string; label: string; icon: any; tab?: TabKey; children?: { key: SubTab | TabKey; label: string; icon: any }[]; }
 
 const NAV_SECTIONS: NavSection[] = [
@@ -24,7 +25,7 @@ const NAV_SECTIONS: NavSection[] = [
   { key: 'properties', label: 'Properties', icon: Building2, tab: 'properties' },
   { key: 'money', label: 'Money', icon: Wallet, children: [{ key: 'dues', label: 'Dues', icon: Receipt }, { key: 'collection', label: 'Collection', icon: CreditCard }, { key: 'expense', label: 'Expense', icon: TrendingDown }] },
   { key: 'people', label: 'People', icon: Users, children: [{ key: 'tenant', label: 'Tenants', icon: UserCheck }, { key: 'add-tenant', label: 'Add Tenant', icon: UserPlus }, { key: 'old-tenants', label: 'Old Tenants', icon: UserX }] },
-  { key: 'passbook', label: 'Passbook', icon: BookOpen, tab: 'passbook' },
+  { key: 'passbook', label: 'Passbook', icon: BookOpen, children: [{ key: 'passbook-ledger', label: 'Ledger', icon: BookOpen }, { key: 'passbook-reports', label: 'Reports', icon: FileBarChart }] },
   { key: 'maintenance', label: 'Maintenance', icon: Wrench, tab: 'maintenance' },
   { key: 'reminders', label: 'Reminders', icon: Bell, tab: 'reminders' },
   { key: 'settings', label: 'Settings', icon: SettingsIcon, tab: 'settings' },
@@ -154,6 +155,7 @@ function App() {
   const handleSubNavClick = (subKey: SubTab | TabKey) => {
     if (subKey === 'dues' || subKey === 'collection' || subKey === 'expense') navigate('rent', subKey as SubTab);
     else if (subKey === 'tenant' || subKey === 'add-tenant' || subKey === 'old-tenants') navigate('tenants', subKey as SubTab);
+    else if (subKey === 'passbook-ledger' || subKey === 'passbook-reports') navigate('passbook', subKey as SubTab);
   };
 
   const getPageTitle = () => {
@@ -163,16 +165,20 @@ function App() {
     if (activeSubTab === 'tenant') return 'Tenants';
     if (activeSubTab === 'add-tenant') return 'Add Tenant';
     if (activeSubTab === 'old-tenants') return 'Old Tenants';
+    if (activeSubTab === 'passbook-ledger') return 'Passbook';
+    if (activeSubTab === 'passbook-reports') return 'Reports Center';
     return NAV_SECTIONS.find(s => s.tab === activeTab)?.label || 'Dashboard';
   };
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'dashboard': return <Dashboard properties={properties} tenants={tenants} payments={payments} maintenance={maintenance} />;
+      case 'dashboard': return <Dashboard properties={properties} tenants={tenants} payments={payments} maintenance={maintenance} expenses={expenses} bills={bills} />;
       case 'properties': return <Properties properties={properties} setProperties={setProperties} tenants={tenants} />;
       case 'tenants': return <Tenants tenants={tenants} setTenants={setTenants} properties={properties} bills={bills} setBills={setBills} payments={payments} setPayments={setPayments} settings={settings} showAddModal={showAddTenant} setShowAddModal={setShowAddTenant} filterType={tenantFilter} onToast={addToast} />;
       case 'rent': return <RentCollection payments={payments} setPayments={setPayments} tenants={tenants} properties={properties} expenses={expenses} setExpenses={setExpenses} bills={bills} setBills={setBills} activeSubTab={activeSubTab as 'dues' | 'collection' | 'expense' | null} onToast={addToast} />;
-      case 'passbook': return <Passbook payments={payments} expenses={expenses} setExpenses={setExpenses} bills={bills} tenants={tenants} properties={properties} onToast={addToast} />;
+      case 'passbook': return activeSubTab === 'passbook-reports'
+        ? <ReportsCenter payments={payments} expenses={expenses} bills={bills} tenants={tenants} properties={properties} />
+        : <Passbook payments={payments} expenses={expenses} setExpenses={setExpenses} bills={bills} tenants={tenants} properties={properties} onToast={addToast} />;
       case 'maintenance': return <Maintenance requests={maintenance} setRequests={setMaintenance} properties={properties} tenants={tenants} />;
       case 'reports': return <Reports expenses={expenses} setExpenses={setExpenses} properties={properties} payments={payments} tenants={tenants} bills={bills} />;
       case 'reminders': return <Reminders reminders={reminders} setReminders={setReminders} tenants={tenants} />;
