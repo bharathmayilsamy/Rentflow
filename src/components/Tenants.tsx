@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { Tenant, TenantStatus, Property, TenantBill, BillType, BillStatus, RentPayment, Settings } from '../types';
 import { generateId, getAvatarColor } from '../data';
 import { formatDate, formatCurrency, daysUntil, getOrdinal, getNextDueDateStr } from '../utils/helpers';
+import { cur, cl, addHeader, addSection, addSummaryBox, addFooter, tblStyle, GREEN } from '../utils/pdfHelpers';
 import { Plus, Edit2, Trash2, Eye, Search, X, Phone, Calendar, Receipt, Zap, Droplets, Wifi, Flame, Wrench, FileText, CheckCircle, Building2, Clock, TrendingUp, AlertCircle, ArrowUpRight, ArrowDownRight, History, CircleDollarSign, Banknote, MinusCircle, FileDown, Lock, Unlock, MessageCircle } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -107,7 +108,7 @@ export default function Tenants({ tenants, setTenants, properties, bills, setBil
   const deleteBill = (billId: string) => { setBills(bills.filter(b => b.id !== billId)); onToast('Bill removed'); };
 
   const exportTenantPDF = (t: Tenant) => {
-    const doc = new jsPDF(); const pw = doc.internal.pageSize.getWidth();
+    const doc = new jsPDF();
     const tp = payments.filter(p => p.tenantId === t.id).sort((a, b) => (a.date || a.dueDate).localeCompare(b.date || b.dueDate));
     const tb = bills.filter(b => b.tenantId === t.id);
     const prop = properties.find(p => p.id === t.propertyId);
@@ -115,18 +116,30 @@ export default function Tenants({ tenants, setTenants, properties, bills, setBil
     const totalDueAmt = tp.filter(p => p.status !== 'Paid').reduce((s, p) => s + (p.dueAmount - p.amount), 0);
     const bPaid = tb.filter(b => b.status === 'Paid').reduce((s, b) => s + b.amount, 0);
     const bPend = tb.filter(b => b.status === 'Pending').reduce((s, b) => s + b.amount, 0);
-    doc.setFontSize(20); doc.setTextColor(99, 102, 241); doc.text('RentFlow', 14, 20);
-    doc.setFontSize(14); doc.setTextColor(0, 0, 0); doc.text(`${t.name} — Transaction History`, 14, 30);
-    doc.setFontSize(10); doc.setTextColor(128, 128, 128); doc.text(`Generated: ${formatDate(new Date().toISOString().split('T')[0])}`, 14, 38);
-    autoTable(doc, { startY: 45, body: [['Property', prop?.name || '—'], ['Room', t.room || '—'], ['Rent', formatCurrency(t.rent)], ['Deposit', formatCurrency(t.deposit)], ['Joined', formatDate(t.leaseStart)], ['Due Day', `${getOrdinal(t.dueDay || 1)} monthly`]], theme: 'plain', styles: { fontSize: 10 }, columnStyles: { 0: { fontStyle: 'bold', cellWidth: 35 } } });
-    let y = (doc as any).lastAutoTable.finalY + 8;
-    doc.setFontSize(12); doc.setTextColor(0, 0, 0); doc.text('Summary', 14, y);
-    autoTable(doc, { startY: y + 4, head: [['', 'Amount']], body: [['Rent Paid', formatCurrency(totalPaid)], ['Rent Pending', formatCurrency(totalDueAmt)], ['Bills Paid', formatCurrency(bPaid)], ['Bills Pending', formatCurrency(bPend)], ['Outstanding', formatCurrency(totalDueAmt + bPend)]], theme: 'striped', headStyles: { fillColor: [99, 102, 241] } });
-    y = (doc as any).lastAutoTable.finalY + 8; doc.text('Rent Payments', 14, y);
-    autoTable(doc, { startY: y + 4, head: [['Due Date', 'Due', 'Paid', 'Date', 'Method', 'Status', 'Receipt']], body: tp.map(p => [formatDate(p.dueDate), formatCurrency(p.dueAmount), formatCurrency(p.amount), p.date ? formatDate(p.date) : '—', p.method, p.status, p.receiptNo || '—']), theme: 'striped', headStyles: { fillColor: [99, 102, 241] }, styles: { fontSize: 8 } });
-    if (tb.length > 0) { y = (doc as any).lastAutoTable.finalY + 8; doc.text('Bills', 14, y); autoTable(doc, { startY: y + 4, head: [['Type', 'Description', 'Amount', 'Due', 'Paid', 'Status']], body: tb.map(b => [b.type, b.description, formatCurrency(b.amount), formatDate(b.dueDate), b.paidDate ? formatDate(b.paidDate) : '—', b.status]), theme: 'striped', headStyles: { fillColor: [34, 197, 94] }, styles: { fontSize: 8 } }); }
-    const pages = doc.getNumberOfPages(); for (let i = 1; i <= pages; i++) { doc.setPage(i); doc.setFontSize(8); doc.setTextColor(128, 128, 128); doc.text(`Page ${i}/${pages} | RentFlow — ${t.name}`, pw / 2, doc.internal.pageSize.getHeight() - 10, { align: 'center' }); }
-    doc.save(`${t.name.replace(/\s+/g, '-')}-history.pdf`); onToast(`PDF exported for ${t.name}`);
+
+    addHeader(doc, cl(t.name) + ' - Transaction History', `${prop?.name || ''} | Room ${t.room || '-'}`);
+    let y = addSummaryBox(doc, 58, [
+      ['Monthly Rent', cur(t.rent)], ['Deposit', cur(t.deposit)], ['Status', t.status],
+      ['Rent Paid', cur(totalPaid)], ['Rent Pending', cur(totalDueAmt)], ['Bills Pending', cur(bPend)],
+      ['Outstanding', cur(totalDueAmt + bPend)], ['Bills Paid', cur(bPaid)], ['Joined', formatDate(t.leaseStart)],
+    ]);
+
+    y = addSection(doc, y, 'Tenant Information');
+    autoTable(doc, { startY: y, body: [['Name', t.name], ['Phone', t.phone || '-'], ['Email', t.email || '-'], ['Property', prop?.name || '-'], ['Room', t.room || '-'], ['Due Day', `${getOrdinal(t.dueDay || 1)} monthly`], ['Lease End', formatDate(t.leaseEnd)], ['EB No', t.ebConsumerNo || '-'], ['Water No', t.waterBillNo || '-']], theme: 'plain' as const, styles: { fontSize: 9, cellPadding: 2 }, columnStyles: { 0: { fontStyle: 'bold' as const, cellWidth: 35, textColor: [100, 116, 139] as [number, number, number] } } });
+
+    y = (doc as any).lastAutoTable.finalY + 6;
+    y = addSection(doc, y, 'Rent Payments');
+    autoTable(doc, { startY: y, head: [['Due Date', 'Due Amount', 'Paid', 'Paid Date', 'Method', 'Status', 'Receipt']], body: tp.map(p => [formatDate(p.dueDate), cur(p.dueAmount), cur(p.amount), p.date ? formatDate(p.date) : '-', p.method, p.status, p.receiptNo || '-']), ...tblStyle() });
+
+    if (tb.length > 0) {
+      y = (doc as any).lastAutoTable.finalY + 6;
+      y = addSection(doc, y, 'Bills & Dues', GREEN);
+      autoTable(doc, { startY: y, head: [['Type', 'Description', 'Amount', 'Due Date', 'Paid Date', 'Status']], body: tb.map(b => [b.type, b.description, cur(b.amount), formatDate(b.dueDate), b.paidDate ? formatDate(b.paidDate) : '-', b.status]), ...tblStyle(GREEN) });
+    }
+
+    addFooter(doc);
+    doc.save(`${t.name.replace(/\s+/g, '-')}-history.pdf`);
+    onToast(`PDF exported for ${t.name}`);
   };
 
   const getTenantStats = (tenantId: string) => {

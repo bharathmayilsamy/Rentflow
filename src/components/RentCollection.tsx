@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { RentPayment, PaymentMethod, PaymentStatus, Tenant, Property, Expense, TenantBill, BillStatus } from '../types';
 import { generateId, generateReceiptNo } from '../data';
 import { formatDate, formatCurrency } from '../utils/helpers';
+import { cur, cl, addHeader, addSection, addSummaryBox, addFooter, tblStyle, GREEN } from '../utils/pdfHelpers';
 import { Plus, CreditCard, Banknote, Smartphone, Building, FileText, X, CheckCircle, Calendar, TrendingDown, Receipt, Wallet, AlertCircle, FileDown } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -112,41 +113,35 @@ export default function RentCollection({ payments, setPayments, tenants, propert
   // Export tenant transaction history PDF
   const exportTenantPDF = (t: Tenant) => {
     const doc = new jsPDF();
-    const pw = doc.internal.pageSize.getWidth();
     const tp = payments.filter(p => p.tenantId === t.id).sort((a, b) => (a.date || a.dueDate).localeCompare(b.date || b.dueDate));
     const tb = bills.filter(b => b.tenantId === t.id).sort((a, b) => a.dueDate.localeCompare(b.dueDate));
     const prop = properties.find(p => p.id === t.propertyId);
     const totalPaid = tp.filter(p => p.status === 'Paid').reduce((s, p) => s + p.amount, 0);
     const totalDue = tp.filter(p => p.status !== 'Paid').reduce((s, p) => s + (p.dueAmount - p.amount), 0);
-    const billsPaid = tb.filter(b => b.status === 'Paid').reduce((s, b) => s + b.amount, 0);
-    const billsPending = tb.filter(b => b.status === 'Pending').reduce((s, b) => s + b.amount, 0);
+    const bPaid = tb.filter(b => b.status === 'Paid').reduce((s, b) => s + b.amount, 0);
+    const bPend = tb.filter(b => b.status === 'Pending').reduce((s, b) => s + b.amount, 0);
 
-    doc.setFontSize(20); doc.setTextColor(99, 102, 241); doc.text('RentFlow', 14, 20);
-    doc.setFontSize(14); doc.setTextColor(0, 0, 0); doc.text('Tenant Transaction History', 14, 30);
-    doc.setFontSize(10); doc.setTextColor(128, 128, 128); doc.text(`Generated: ${formatDate(new Date().toISOString().split('T')[0])}`, 14, 38);
+    addHeader(doc, cl(t.name) + ' - Transaction History', `${prop?.name || ''} | Room ${t.room || '-'}`);
+    let y = addSummaryBox(doc, 58, [
+      ['Monthly Rent', cur(t.rent)], ['Deposit', cur(t.deposit)], ['Status', t.status],
+      ['Rent Paid', cur(totalPaid)], ['Rent Pending', cur(totalDue)], ['Bills Pending', cur(bPend)],
+      ['Total Outstanding', cur(totalDue + bPend)], ['Bills Paid', cur(bPaid)], ['Joined', formatDate(t.leaseStart)],
+    ]);
 
-    // Tenant info
-    autoTable(doc, { startY: 45, body: [['Name', t.name], ['Property', prop?.name || '—'], ['Room', t.room || '—'], ['Monthly Rent', formatCurrency(t.rent)], ['Deposit', formatCurrency(t.deposit)], ['Date of Joining', formatDate(t.leaseStart)], ['Due Day', `${t.dueDay || 1} of every month`], ['Status', t.status]], theme: 'plain', styles: { fontSize: 10 }, columnStyles: { 0: { fontStyle: 'bold', cellWidth: 40 } } });
+    y = addSection(doc, y, 'Tenant Information');
+    autoTable(doc, { startY: y, body: [['Name', t.name], ['Phone', t.phone || '-'], ['Email', t.email || '-'], ['Property', prop?.name || '-'], ['Room', t.room || '-'], ['Due Day', `${t.dueDay || 1} of every month`], ['Lease End', formatDate(t.leaseEnd)], ['EB No', t.ebConsumerNo || '-'], ['Water No', t.waterBillNo || '-']], theme: 'plain' as const, styles: { fontSize: 9, cellPadding: 2 }, columnStyles: { 0: { fontStyle: 'bold' as const, cellWidth: 35, textColor: [100, 116, 139] as [number, number, number] } } });
 
-    // Summary
-    let y = (doc as any).lastAutoTable.finalY + 8;
-    doc.setFontSize(12); doc.setTextColor(0, 0, 0); doc.text('Financial Summary', 14, y);
-    autoTable(doc, { startY: y + 4, head: [['Category', 'Amount']], body: [['Total Rent Paid', formatCurrency(totalPaid)], ['Rent Pending/Overdue', formatCurrency(totalDue)], ['Bills Paid', formatCurrency(billsPaid)], ['Bills Pending', formatCurrency(billsPending)], ['Advance/Balance', formatCurrency(totalPaid - tp.filter(p => p.status === 'Paid').reduce((s, p) => s + p.dueAmount, 0))], ['Total Outstanding', formatCurrency(totalDue + billsPending)]], theme: 'striped', headStyles: { fillColor: [99, 102, 241] } });
+    y = (doc as any).lastAutoTable.finalY + 6;
+    y = addSection(doc, y, 'Rent Payments');
+    autoTable(doc, { startY: y, head: [['Due Date', 'Due Amount', 'Paid', 'Paid Date', 'Method', 'Status', 'Receipt']], body: tp.map(p => [formatDate(p.dueDate), cur(p.dueAmount), cur(p.amount), p.date ? formatDate(p.date) : '-', p.method, p.status, p.receiptNo || '-']), ...tblStyle() });
 
-    // Rent payments
-    y = (doc as any).lastAutoTable.finalY + 8;
-    doc.text('Rent Payment History', 14, y);
-    autoTable(doc, { startY: y + 4, head: [['Due Date', 'Amount Due', 'Paid', 'Date Paid', 'Method', 'Status', 'Receipt']], body: tp.map(p => [formatDate(p.dueDate), formatCurrency(p.dueAmount), formatCurrency(p.amount), p.date ? formatDate(p.date) : '—', p.method, p.status, p.receiptNo || '—']), theme: 'striped', headStyles: { fillColor: [99, 102, 241] }, styles: { fontSize: 8 } });
-
-    // Bills
     if (tb.length > 0) {
-      y = (doc as any).lastAutoTable.finalY + 8;
-      doc.text('Bills & Dues', 14, y);
-      autoTable(doc, { startY: y + 4, head: [['Type', 'Description', 'Amount', 'Due Date', 'Paid Date', 'Status']], body: tb.map(b => [b.type, b.description, formatCurrency(b.amount), formatDate(b.dueDate), b.paidDate ? formatDate(b.paidDate) : '—', b.status]), theme: 'striped', headStyles: { fillColor: [34, 197, 94] }, styles: { fontSize: 8 } });
+      y = (doc as any).lastAutoTable.finalY + 6;
+      y = addSection(doc, y, 'Bills & Dues', GREEN);
+      autoTable(doc, { startY: y, head: [['Type', 'Description', 'Amount', 'Due Date', 'Paid Date', 'Status']], body: tb.map(b => [b.type, b.description, cur(b.amount), formatDate(b.dueDate), b.paidDate ? formatDate(b.paidDate) : '-', b.status]), ...tblStyle(GREEN) });
     }
 
-    const pages = doc.getNumberOfPages();
-    for (let i = 1; i <= pages; i++) { doc.setPage(i); doc.setFontSize(8); doc.setTextColor(128, 128, 128); doc.text(`Page ${i}/${pages} | RentFlow - ${t.name}`, pw / 2, doc.internal.pageSize.getHeight() - 10, { align: 'center' }); }
+    addFooter(doc);
     doc.save(`${t.name.replace(/\s+/g, '-')}-history.pdf`);
     onToast(`PDF exported for ${t.name}`);
   };

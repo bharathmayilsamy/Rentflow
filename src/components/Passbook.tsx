@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { RentPayment, Expense, TenantBill, Tenant, Property } from '../types';
 import { generateId } from '../data';
 import { formatDate, formatCurrency } from '../utils/helpers';
+import { cur, addHeader, addSection, addSummaryBox, addFooter, tblStyle, GREEN, RED } from '../utils/pdfHelpers';
 import { Download, FileSpreadsheet, FileText, Calendar, TrendingUp, TrendingDown, Wallet, ArrowUpCircle, ArrowDownCircle, X, Search, Plus, Trash2 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -154,32 +155,27 @@ export default function Passbook({ payments, expenses, setExpenses, bills, tenan
   // Export PDF
   const exportPDF = () => {
     const doc = new jsPDF();
-    const pw = doc.internal.pageSize.getWidth();
-    doc.setFontSize(20); doc.setTextColor(99, 102, 241); doc.text('RentFlow', 14, 20);
-    doc.setFontSize(14); doc.setTextColor(0, 0, 0); doc.text('Complete Passbook & P&L Statement', 14, 30);
-    doc.setFontSize(10); doc.setTextColor(128, 128, 128); doc.text(`Generated: ${formatDate(new Date().toISOString().split('T')[0])}`, 14, 38);
+    addHeader(doc, 'Passbook & P/L Statement', `${ledger.length} transactions`);
+    let y = addSummaryBox(doc, 58, [['Total Income', cur(totalIncome)], ['Total Expense', cur(totalExpense)], ['Net Balance', cur(netBalance)]]);
 
-    autoTable(doc, { startY: 45, head: [['', 'Amount (₹)']], body: [['Total Income', totalIncome.toLocaleString()], ['Total Expense', `(${totalExpense.toLocaleString()})`], ['Net Balance', netBalance.toLocaleString()]], theme: 'striped', headStyles: { fillColor: [99, 102, 241] } });
+    y = addSection(doc, y, 'Monthly P&L');
+    autoTable(doc, { startY: y, head: [['Month', 'Income', 'Expense', 'Profit/Loss']], body: monthlyPL.map(m => [m.month, cur(m.income), cur(m.expense), cur(m.profit)]), ...tblStyle(),
+      didParseCell: (data: any) => { if (data.section === 'body' && data.column.index === 3) { const raw = data.cell.raw as string; const neg = raw.includes('-'); data.cell.styles.textColor = neg ? [220, 38, 38] : [22, 163, 74]; data.cell.styles.fontStyle = 'bold'; } } });
 
-    let y = (doc as any).lastAutoTable.finalY + 10;
-    doc.text('Monthly P&L', 14, y);
-    autoTable(doc, { startY: y + 4, head: [['Month', 'Income', 'Expense', 'Profit/Loss']], body: monthlyPL.map(m => [m.month, m.income.toLocaleString(), m.expense.toLocaleString(), m.profit.toLocaleString()]), theme: 'striped', headStyles: { fillColor: [99, 102, 241] } });
+    y = (doc as any).lastAutoTable.finalY + 6;
+    y = addSection(doc, y, 'All Transactions');
+    autoTable(doc, { startY: y, head: [['Date', 'Type', 'Category', 'Description', 'Amount', 'Balance']], body: filtered.map(e => [formatDate(e.date), e.type, e.category, e.description.replace(/[^\x00-\x7F]/g, '').slice(0, 35), `${e.type === 'Income' ? '+' : '-'} ${cur(e.amount)}`, cur(e.balance)]), ...tblStyle(),
+      didParseCell: (data: any) => { if (data.section === 'body' && data.column.index === 1) { data.cell.styles.textColor = data.cell.text[0] === 'Income' ? [22, 163, 74] : [220, 38, 38]; data.cell.styles.fontStyle = 'bold'; } } });
 
-    y = (doc as any).lastAutoTable.finalY + 10;
-    doc.text('All Transactions', 14, y);
-    autoTable(doc, { startY: y + 4, head: [['Date', 'Type', 'Category', 'Description', 'Amount', 'Balance']], body: filtered.map(e => [formatDate(e.date), e.type, e.category, e.description.slice(0, 40), `${e.type === 'Income' ? '+' : '-'}${e.amount.toLocaleString()}`, e.balance.toLocaleString()]), theme: 'striped', headStyles: { fillColor: [99, 102, 241] }, styles: { fontSize: 7 } });
+    y = (doc as any).lastAutoTable.finalY + 6;
+    y = addSection(doc, y, 'Income by Category', GREEN);
+    autoTable(doc, { startY: y, head: [['Category', 'Amount', '% of Total']], body: categoryBreakdown.income.map(([c, a]) => [c, cur(a), totalIncome > 0 ? `${((a / totalIncome) * 100).toFixed(1)}%` : '0%']), ...tblStyle(GREEN) });
 
-    y = (doc as any).lastAutoTable.finalY + 10;
-    if (y > 250) { doc.addPage(); y = 20; }
-    doc.text('Income by Category', 14, y);
-    autoTable(doc, { startY: y + 4, head: [['Category', 'Amount']], body: categoryBreakdown.income.map(([c, a]) => [c, a.toLocaleString()]), theme: 'striped', headStyles: { fillColor: [34, 197, 94] } });
+    y = (doc as any).lastAutoTable.finalY + 6;
+    y = addSection(doc, y, 'Expenses by Category', RED);
+    autoTable(doc, { startY: y, head: [['Category', 'Amount', '% of Total']], body: categoryBreakdown.expense.map(([c, a]) => [c, cur(a), totalExpense > 0 ? `${((a / totalExpense) * 100).toFixed(1)}%` : '0%']), ...tblStyle(RED) });
 
-    y = (doc as any).lastAutoTable.finalY + 8;
-    doc.text('Expenses by Category', 14, y);
-    autoTable(doc, { startY: y + 4, head: [['Category', 'Amount']], body: categoryBreakdown.expense.map(([c, a]) => [c, a.toLocaleString()]), theme: 'striped', headStyles: { fillColor: [239, 68, 68] } });
-
-    const pages = doc.getNumberOfPages();
-    for (let i = 1; i <= pages; i++) { doc.setPage(i); doc.setFontSize(8); doc.setTextColor(128, 128, 128); doc.text(`Page ${i}/${pages} | RentFlow Passbook`, pw / 2, doc.internal.pageSize.getHeight() - 10, { align: 'center' }); }
+    addFooter(doc);
     doc.save('RentFlow-Passbook.pdf');
   };
 
