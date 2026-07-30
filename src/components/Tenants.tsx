@@ -271,7 +271,12 @@ export default function Tenants({ tenants, setTenants, properties, bills, setBil
                     <Calendar className="w-4 h-4 text-indigo-600 shrink-0" />
                     <div className="flex-1">
                       <p className="text-xs font-semibold text-indigo-700">Upcoming rent cycle</p>
-                      <p className="text-[10px] text-indigo-600">Scheduled rent due date: {formatDate(nextDueDate)}</p>
+                      <p className="text-[10px] text-indigo-600">
+                        Scheduled rent due date: {formatDate(nextDueDate)} • 
+                        <span className="ml-1 inline-flex items-center rounded-full bg-indigo-600 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm">
+                          {dueDays} day{dueDays !== 1 ? 's' : ''} left
+                        </span>
+                      </p>
                     </div>
                   </div>
                 )}

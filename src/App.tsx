@@ -15,10 +15,11 @@ import SettingsPage from './components/Settings';
 import Passbook from './components/Passbook';
 import ReportsCenter from './components/ReportsCenter';
 import Documents from './components/Documents';
+import TenantPortal from './components/TenantPortal';
 import Toast, { ToastMessage } from './components/Toast';
-import { LayoutDashboard, Building2, Users, Wallet, Wrench, Bell, Settings as SettingsIcon, Menu, X, Home, ChevronDown, UserPlus, UserCheck, UserX, Receipt, CreditCard, TrendingDown, BookOpen, Loader2, FileBarChart, ClipboardList, FolderOpen } from 'lucide-react';
+import { LayoutDashboard, Building2, Users, Wallet, Wrench, Bell, Settings as SettingsIcon, Menu, X, Home, ChevronDown, UserPlus, UserCheck, UserX, Receipt, CreditCard, TrendingDown, BookOpen, Loader2, FileBarChart, ClipboardList, FolderOpen, Sliders, Share2 } from 'lucide-react';
 
-type SubTab = 'dues' | 'collection' | 'expense' | 'tenant' | 'add-tenant' | 'old-tenants' | 'passbook-ledger' | 'passbook-reports' | 'maint-requests' | 'maint-docs';
+type SubTab = 'dues' | 'collection' | 'expense' | 'tenant' | 'add-tenant' | 'old-tenants' | 'passbook-ledger' | 'passbook-reports' | 'maint-requests' | 'maint-docs' | 'settings-general' | 'settings-portal';
 interface NavSection { key: string; label: string; icon: any; tab?: TabKey; children?: { key: SubTab | TabKey; label: string; icon: any }[]; }
 
 const NAV_SECTIONS: NavSection[] = [
@@ -29,7 +30,7 @@ const NAV_SECTIONS: NavSection[] = [
   { key: 'passbook', label: 'Passbook', icon: BookOpen, children: [{ key: 'passbook-ledger', label: 'Ledger', icon: BookOpen }, { key: 'passbook-reports', label: 'Reports', icon: FileBarChart }] },
   { key: 'maintenance', label: 'Maintenance', icon: Wrench, children: [{ key: 'maint-requests', label: 'Requests', icon: ClipboardList }, { key: 'maint-docs', label: 'Documents', icon: FolderOpen }] },
   { key: 'reminders', label: 'Reminders', icon: Bell, tab: 'reminders' },
-  { key: 'settings', label: 'Settings', icon: SettingsIcon, tab: 'settings' },
+  { key: 'settings', label: 'Settings', icon: SettingsIcon, children: [{ key: 'settings-general', label: 'General', icon: Sliders }, { key: 'settings-portal', label: 'Tenant Portal', icon: Share2 }] },
 ];
 
 function App() {
@@ -158,6 +159,7 @@ function App() {
     else if (subKey === 'tenant' || subKey === 'add-tenant' || subKey === 'old-tenants') navigate('tenants', subKey as SubTab);
     else if (subKey === 'passbook-ledger' || subKey === 'passbook-reports') navigate('passbook', subKey as SubTab);
     else if (subKey === 'maint-requests' || subKey === 'maint-docs') navigate('maintenance', subKey as SubTab);
+    else if (subKey === 'settings-general' || subKey === 'settings-portal') navigate('settings', subKey as SubTab);
   };
 
   const getPageTitle = () => {
@@ -171,6 +173,8 @@ function App() {
     if (activeSubTab === 'passbook-reports') return 'Reports Center';
     if (activeSubTab === 'maint-requests') return 'Maintenance Requests';
     if (activeSubTab === 'maint-docs') return 'Documents & Files';
+    if (activeSubTab === 'settings-general') return 'Settings';
+    if (activeSubTab === 'settings-portal') return 'Tenant Portal';
     return NAV_SECTIONS.find(s => s.tab === activeTab)?.label || 'Dashboard';
   };
 
@@ -188,7 +192,9 @@ function App() {
         : <Maintenance requests={maintenance} setRequests={setMaintenance} properties={properties} tenants={tenants} />;
       case 'reports': return <Reports expenses={expenses} setExpenses={setExpenses} properties={properties} payments={payments} tenants={tenants} bills={bills} />;
       case 'reminders': return <Reminders reminders={reminders} setReminders={setReminders} tenants={tenants} />;
-      case 'settings': return <SettingsPage settings={settings} setSettings={setSettings} users={users} setUsers={setUsers} currentUserRole={currentUser?.role || 'Staff'} onLogout={handleLogout} />;
+      case 'settings': return activeSubTab === 'settings-portal'
+        ? <TenantPortal tenants={tenants} payments={payments} bills={bills} properties={properties} maintenance={maintenance} onToast={addToast} />
+        : <SettingsPage settings={settings} setSettings={setSettings} users={users} setUsers={setUsers} currentUserRole={currentUser?.role || 'Staff'} onLogout={handleLogout} />;
       default: return null;
     }
   };
