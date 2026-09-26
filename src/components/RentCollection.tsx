@@ -3,7 +3,7 @@ import { RentPayment, PaymentMethod, PaymentStatus, Tenant, Property, Expense, T
 import { generateId, generateReceiptNo } from '../data';
 import { formatDate, formatCurrency } from '../utils/helpers';
 import { cur, cl, addHeader, addSection, addSummaryBox, addFooter, tblStyle, GREEN } from '../utils/pdfHelpers';
-import { Plus, CreditCard, Banknote, Smartphone, Building, FileText, X, CheckCircle, Calendar, TrendingDown, Receipt, Wallet, AlertCircle, FileDown } from 'lucide-react';
+import { Plus, CreditCard, Banknote, Smartphone, Building, FileText, X, CheckCircle, Calendar, TrendingDown, Receipt, Wallet, AlertCircle, FileDown, Trash2, Zap, Droplets, Wifi, Flame, Wrench } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -24,6 +24,8 @@ const STATUS_COLORS: Record<PaymentStatus, string> = { Paid: 'bg-green-100 text-
 const METHOD_ICONS: Record<PaymentMethod, any> = { UPI: Smartphone, Cash: Banknote, 'Bank Transfer': Building, Card: CreditCard, Cheque: FileText };
 const METHODS: PaymentMethod[] = ['UPI', 'Cash', 'Bank Transfer', 'Card', 'Cheque'];
 const EXPENSE_CATEGORIES = ['Maintenance', 'Repairs', 'Utilities', 'Insurance', 'Tax', 'Salary', 'Other'];
+const BILL_ICONS: Record<string, any> = { Electricity: Zap, Water: Droplets, Tax: FileText, Internet: Wifi, Gas: Flame, Maintenance: Wrench, Other: Receipt };
+const BILL_COLORS: Record<string, string> = { Electricity: 'bg-yellow-100 text-yellow-700', Water: 'bg-blue-100 text-blue-700', Tax: 'bg-purple-100 text-purple-700', Internet: 'bg-cyan-100 text-cyan-700', Gas: 'bg-orange-100 text-orange-700', Maintenance: 'bg-green-100 text-green-700', Other: 'bg-gray-100 text-gray-700' };
 
 export default function RentCollection({ payments, setPayments, tenants, properties, expenses, setExpenses, bills, setBills, activeSubTab, onToast }: Props) {
   const [showPayForm, setShowPayForm] = useState(false);
@@ -99,6 +101,25 @@ export default function RentCollection({ payments, setPayments, tenants, propert
     setBills(bills.map(b => b.tenantId === tenantId && b.status === 'Pending' ? { ...b, status: 'Paid' as BillStatus, paidDate: today } : b));
     const tenant = tenants.find(t => t.id === tenantId);
     onToast(`${pendingBills.length} bills (${formatCurrency(total)}) collected from ${tenant?.name} → Passbook updated`);
+  };
+
+  // Collect a single bill
+  const collectSingleBill = (billId: string) => {
+    const bill = bills.find(b => b.id === billId);
+    if (!bill) return;
+    const today = new Date().toISOString().split('T')[0];
+    setBills(bills.map(b => b.id === billId ? { ...b, status: 'Paid' as BillStatus, paidDate: today } : b));
+    const tenant = tenants.find(t => t.id === bill.tenantId);
+    onToast(`${bill.type} bill ${formatCurrency(bill.amount)} collected from ${tenant?.name} → Passbook updated`);
+  };
+
+  // Delete a single bill
+  const deleteSingleBill = (billId: string) => {
+    const bill = bills.find(b => b.id === billId);
+    if (!bill) return;
+    if (!window.confirm(`Delete ${bill.type} bill "${bill.description}" (${formatCurrency(bill.amount)})?`)) return;
+    setBills(bills.filter(b => b.id !== billId));
+    onToast('Bill deleted');
   };
 
   const addExpense = () => {
@@ -197,7 +218,7 @@ export default function RentCollection({ payments, setPayments, tenants, propert
                       </div>
                       <div className="flex items-center gap-3">
                         <div className="text-right"><p className="text-sm font-bold text-red-600">{formatCurrency(p.dueAmount - p.amount)}</p><span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${STATUS_COLORS[p.status]}`}>{p.status}</span></div>
-                        <button onClick={() => openPayForm(p)} className="text-xs bg-green-600 text-white px-3 py-1.5 rounded-lg hover:bg-green-700 transition font-medium">Collect</button>
+                        <button onClick={() => openPayForm(p)} className="text-xs bg-green-600 text-white px-3 py-1.5 rounded-lg hover:bg-green-700 transition font-bold">Collect</button>
                       </div>
                     </div>
                   ))}
@@ -205,22 +226,35 @@ export default function RentCollection({ payments, setPayments, tenants, propert
                   {item.pendingBills.length > 0 && (
                     <div className="p-3 bg-orange-50/50 rounded-lg">
                       <div className="flex items-center justify-between mb-2">
-                        <p className="text-sm font-medium text-orange-700 flex items-center gap-1.5"><AlertCircle className="w-3.5 h-3.5" /> Pending Bills</p>
+                        <p className="text-sm font-medium text-orange-700 flex items-center gap-1.5"><AlertCircle className="w-3.5 h-3.5" /> Pending Bills ({item.pendingBills.length})</p>
                         <div className="flex items-center gap-2">
                           <p className="text-sm font-bold text-orange-700">{formatCurrency(item.billsTotal)}</p>
-                          <button onClick={() => collectAllBills(item.tenant.id)} className="text-xs bg-orange-600 text-white px-3 py-1 rounded-lg hover:bg-orange-700 transition font-medium">Collect Bills</button>
+                          <button onClick={() => collectAllBills(item.tenant.id)} className="text-[10px] bg-orange-600 text-white px-2.5 py-1 rounded-lg hover:bg-orange-700 transition font-bold">Collect All</button>
                         </div>
                       </div>
-                      <div className="space-y-1">
-                        {item.pendingBills.map(b => (
-                          <div key={b.id} className="flex items-center justify-between text-xs gap-3">
-                            <div className="min-w-0">
-                              <span className="text-gray-600 block truncate">{b.type}: {b.description}</span>
-                              <span className="text-[10px] text-gray-400">Due: {formatDate(b.dueDate)}</span>
+                      <div className="space-y-1.5">
+                        {item.pendingBills.map(b => {
+                          const BIcon = BILL_ICONS[b.type] || Receipt;
+                          const isOverdue = b.dueDate && b.dueDate < new Date().toISOString().split('T')[0];
+                          return (
+                            <div key={b.id} className={`flex items-center justify-between gap-3 p-2 rounded-lg border ${isOverdue ? 'bg-red-50/60 border-red-100' : 'bg-white border-orange-100'}`}>
+                              <div className="flex items-center gap-2 min-w-0">
+                                <div className={`p-1.5 rounded-md shrink-0 ${BILL_COLORS[b.type] || 'bg-gray-100 text-gray-600'}`}><BIcon className="w-3.5 h-3.5" /></div>
+                                <div className="min-w-0">
+                                  <span className="text-xs font-medium text-gray-800 block truncate">{b.description}</span>
+                                  <span className={`text-[10px] ${isOverdue ? 'text-red-600 font-semibold' : 'text-gray-400'}`}>
+                                    {b.type} • Due: {formatDate(b.dueDate)}{isOverdue ? ' • Overdue' : ''}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span className="text-xs font-bold text-orange-600">{formatCurrency(b.amount)}</span>
+                                <button onClick={() => collectSingleBill(b.id)} className="text-[11px] bg-green-600 text-white px-2.5 py-1 rounded-lg hover:bg-green-700 transition font-bold">Collect</button>
+                                <button onClick={() => deleteSingleBill(b.id)} className="p-1 rounded-md hover:bg-red-100 text-gray-300 hover:text-red-500 transition"><Trash2 className="w-3.5 h-3.5" /></button>
+                              </div>
                             </div>
-                            <span className="font-semibold text-orange-600 shrink-0">{formatCurrency(b.amount)}</span>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   )}

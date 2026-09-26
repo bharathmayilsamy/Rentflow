@@ -94,6 +94,50 @@ export default function Tenants({ tenants, setTenants, properties, bills, setBil
     setPayments([...payments, { id: generateId(), tenantId: t.id, tenantName: t.name, propertyId: t.propertyId, room: t.room, amount: 0, dueAmount: t.rent, method: 'UPI', status: 'Pending', date: '', dueDate, receiptNo: '' }]);
     onToast(`Rent due added → Passbook updated`);
   };
+
+  // Current month's rent period (YYYY-MM based on due day cycle)
+  const getCurrentRentPeriod = (t: Tenant) => {
+    const today = new Date();
+    const dueDay = t.dueDay || 1;
+    // If today is on/after the due day, current period is this month; else it's still previous cycle
+    const periodDate = today.getDate() >= dueDay ? new Date(today.getFullYear(), today.getMonth(), dueDay) : new Date(today.getFullYear(), today.getMonth() - 1, dueDay);
+    return periodDate.toISOString().split('T')[0];
+  };
+
+  // Check if rent already paid for current cycle
+  const isRentPaidThisCycle = (t: Tenant) => {
+    const period = getCurrentRentPeriod(t);
+    return payments.find(p => p.tenantId === t.id && p.status === 'Paid' && p.dueDate === period);
+  };
+
+  // One-click mark rent paid
+  const quickMarkRentPaid = (t: Tenant) => {
+    const period = getCurrentRentPeriod(t);
+    const alreadyPaid = isRentPaidThisCycle(t);
+    if (alreadyPaid) {
+      onToast(`${t.name} already paid ${formatCurrency(alreadyPaid.amount)} for this cycle (${formatDate(period)})`, 'info');
+      return;
+    }
+    const today = new Date().toISOString().split('T')[0];
+    // Update existing pending due for this period if it exists, else create a paid record
+    const existingDue = payments.find(p => p.tenantId === t.id && p.status !== 'Paid' && p.dueDate === period);
+    if (existingDue) {
+      setPayments(payments.map(p => p.id === existingDue.id ? { ...p, amount: p.dueAmount, status: 'Paid' as any, method: 'Cash', date: today, receiptNo: p.receiptNo || `RCP-${Date.now().toString().slice(-8)}` } : p));
+    } else {
+      setPayments([...payments, { id: generateId(), tenantId: t.id, tenantName: t.name, propertyId: t.propertyId, room: t.room, amount: t.rent, dueAmount: t.rent, method: 'Cash', status: 'Paid' as any, date: today, dueDate: period, receiptNo: `RCP-${Date.now().toString().slice(-8)}` }]);
+    }
+    onToast(`${t.name} rent ${formatCurrency(t.rent)} marked PAID → Passbook updated`);
+  };
+
+  // Void / remove the quick-added rent payment for current cycle
+  const voidRentPayment = (t: Tenant) => {
+    const period = getCurrentRentPeriod(t);
+    const paidRecord = payments.find(p => p.tenantId === t.id && p.status === 'Paid' && p.dueDate === period);
+    if (!paidRecord) { onToast('No paid rent this cycle to void', 'info'); return; }
+    if (!window.confirm(`Void rent payment of ${formatCurrency(paidRecord.amount)} for ${t.name} (${formatDate(period)})?\n\nThis will remove the entry from the ledger.`)) return;
+    setPayments(payments.filter(p => p.id !== paidRecord.id));
+    onToast(`Rent payment voided for ${t.name}`);
+  };
   const removeRentDue = (tenantId: string) => {
     const unpaid = payments.filter(p => p.tenantId === tenantId && p.status === 'Pending').sort((a, b) => b.dueDate.localeCompare(a.dueDate));
     if (unpaid.length === 0) { onToast('No pending rent', 'info'); return; }
@@ -144,6 +188,7 @@ export default function Tenants({ tenants, setTenants, properties, bills, setBil
 
   const getTenantStats = (tenantId: string) => {
     const today = new Date().toISOString().split('T')[0];
+    const tenant = tenants.find(t => t.id === tenantId);
     const tp = payments.filter(p => p.tenantId === tenantId);
     const tb = bills.filter(b => b.tenantId === tenantId);
     const totalPaid = tp.filter(p => p.status === 'Paid').reduce((s, p) => s + p.amount, 0);
@@ -155,7 +200,16 @@ export default function Tenants({ tenants, setTenants, properties, bills, setBil
     const nextDuePayment = unpaid.filter(p => !p.dueDate || p.dueDate >= today).sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''))[0];
     const billsPending = tb.filter(b => b.status === 'Pending').reduce((s, b) => s + b.amount, 0);
     const lastPaid = tp.filter(p => p.status === 'Paid' && p.date).sort((a, b) => b.date.localeCompare(a.date))[0];
-    return { totalPaid, overdue, overdueCount, overdueDays, upcoming, nextDuePayment, billsPending, lastPaid, paymentCount: tp.length, billCount: tb.length, hasPendingDue: unpaid.length > 0 };
+    // Payment behaviour score (0-100)
+    const paidCount = tp.filter(p => p.status === 'Paid').length;
+    const score = tp.length > 0 ? Math.round((paidCount / tp.length) * 100) : 100;
+    // Tenure in months
+    const tenureMonths = tenant?.leaseStart ? Math.max(0, Math.round((Date.now() - new Date(tenant.leaseStart).getTime()) / (30.44 * 86400000))) : 0;
+    // Lease expiry
+    const leaseDaysLeft = tenant?.leaseEnd ? daysUntil(tenant.leaseEnd) : null;
+    const leaseExpiringSoon = leaseDaysLeft !== null && leaseDaysLeft >= 0 && leaseDaysLeft <= 30;
+    const leaseExpired = leaseDaysLeft !== null && leaseDaysLeft < 0;
+    return { totalPaid, overdue, overdueCount, overdueDays, upcoming, nextDuePayment, billsPending, lastPaid, paymentCount: tp.length, billCount: tb.length, hasPendingDue: unpaid.length > 0, score, tenureMonths, leaseDaysLeft, leaseExpiringSoon, leaseExpired, paidCount };
   };
 
   const grandStats = useMemo(() => {
@@ -204,8 +258,8 @@ export default function Tenants({ tenants, setTenants, properties, bills, setBil
           const totalOwed = stats.upcoming + stats.billsPending + stats.overdue;
 
           return (
-            <div key={t.id} className={`bg-white rounded-2xl shadow-sm border hover:shadow-lg transition-all duration-200 overflow-hidden ${hasOverdue ? 'border-red-200' : isDueSoon ? 'border-amber-200' : 'border-gray-100'}`}>
-              <div className={`h-1 ${hasOverdue ? 'bg-red-500' : isDueSoon ? 'bg-amber-400' : stats.lastPaid ? 'bg-emerald-500' : 'bg-gray-200'}`} />
+            <div key={t.id} className={`bg-white rounded-2xl shadow-sm border hover:shadow-lg transition-all duration-200 overflow-hidden ${hasOverdue ? 'border-red-200' : isRentPaidThisCycle(t) ? 'border-emerald-200' : isDueSoon ? 'border-amber-200' : 'border-gray-100'}`}>
+              <div className={`h-1 ${hasOverdue ? 'bg-red-500' : isRentPaidThisCycle(t) ? 'bg-emerald-600' : isDueSoon ? 'bg-amber-400' : stats.lastPaid ? 'bg-emerald-500' : 'bg-gray-200'}`} />
               <div className="p-5">
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-3">
@@ -221,6 +275,9 @@ export default function Tenants({ tenants, setTenants, properties, bills, setBil
                       <div className="flex items-center gap-2 mt-0.5">
                         <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold uppercase tracking-wide ${STATUS_COLORS[t.status]}`}>{t.status}</span>
                         {t.room && <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 font-semibold">Room {t.room}</span>}
+                        {isRentPaidThisCycle(t) && <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-600 text-white font-bold">PAID</span>}
+                        {stats.score >= 90 && <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 font-semibold">Good Payer</span>}
+                        {stats.score < 70 && stats.paymentCount > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-50 text-red-700 font-semibold">At Risk</span>}
                       </div>
                     </div>
                   </div>
@@ -250,6 +307,19 @@ export default function Tenants({ tenants, setTenants, properties, bills, setBil
                   )}
                 </div>
 
+                {/* Lease alert */}
+                {(stats.leaseExpired || stats.leaseExpiringSoon) && (
+                  <div className={`flex items-center gap-2 p-2.5 mb-2 rounded-xl border ${stats.leaseExpired ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200'}`}>
+                    <Calendar className={`w-4 h-4 shrink-0 ${stats.leaseExpired ? 'text-red-600' : 'text-amber-600'}`} />
+                    <div className="flex-1">
+                      <p className={`text-xs font-bold ${stats.leaseExpired ? 'text-red-700' : 'text-amber-700'}`}>
+                        {stats.leaseExpired ? 'Lease Expired' : `Lease ends in ${stats.leaseDaysLeft} day${stats.leaseDaysLeft !== 1 ? 's' : ''}`}
+                      </p>
+                      <p className="text-[10px] text-gray-500">Lease end: {formatDate(t.leaseEnd)} — renewal needed</p>
+                    </div>
+                  </div>
+                )}
+
                 {hasOverdue ? (
                   <div className="flex items-center gap-2 p-2.5 bg-red-50 border border-red-100 rounded-xl mb-3">
                     <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
@@ -265,6 +335,15 @@ export default function Tenants({ tenants, setTenants, properties, bills, setBil
                       <p className="text-xs font-semibold text-amber-700">Next due in {dueDays} day{dueDays !== 1 ? 's' : ''}</p>
                       <p className="text-[10px] text-amber-600">Rent due on {formatDate(nextDueDate)}</p>
                     </div>
+                  </div>
+                ) : isRentPaidThisCycle(t) ? (
+                  <div className="flex items-center gap-2 p-2.5 bg-emerald-50 border border-emerald-100 rounded-xl mb-3">
+                    <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-xs font-semibold text-emerald-700">Rent paid for this cycle</p>
+                      <p className="text-[10px] text-emerald-600">Paid {formatDate(isRentPaidThisCycle(t)!.date)} • {isRentPaidThisCycle(t)!.receiptNo}</p>
+                    </div>
+                    <span className="text-[10px] px-2 py-1 rounded-full bg-emerald-600 text-white font-bold shrink-0">PAID</span>
                   </div>
                 ) : (
                   <div className="flex items-center gap-2 p-2.5 bg-indigo-50 border border-indigo-100 rounded-xl mb-3">
@@ -293,20 +372,61 @@ export default function Tenants({ tenants, setTenants, properties, bills, setBil
                   </div>
                 </div>
 
+                {/* Mini stats: Payment score, tenure, deposit */}
+                <div className="grid grid-cols-3 gap-2 mb-3">
+                  <div className="bg-white border border-gray-100 rounded-lg p-2 text-center">
+                    <p className={`text-sm font-black ${stats.score >= 90 ? 'text-emerald-600' : stats.score >= 70 ? 'text-amber-600' : 'text-red-600'}`}>{stats.score}%</p>
+                    <p className="text-[9px] text-gray-400 font-medium">Pay Score</p>
+                  </div>
+                  <div className="bg-white border border-gray-100 rounded-lg p-2 text-center">
+                    <p className="text-sm font-black text-indigo-600">{stats.tenureMonths}mo</p>
+                    <p className="text-[9px] text-gray-400 font-medium">Stay</p>
+                  </div>
+                  <div className="bg-white border border-gray-100 rounded-lg p-2 text-center">
+                    <p className="text-sm font-black text-slate-700">{formatCurrency(t.deposit)}</p>
+                    <p className="text-[9px] text-gray-400 font-medium">Deposit</p>
+                  </div>
+                </div>
+
                 <div className="bg-gray-50 rounded-xl p-3 space-y-1.5">
                   {stats.overdue > 0 && <div className="flex items-center justify-between"><span className="text-xs text-red-600 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> Overdue</span><span className="text-sm font-semibold text-red-600">{formatCurrency(stats.overdue)}</span></div>}
                   {stats.upcoming > 0 && <div className="flex items-center justify-between"><span className="text-xs text-indigo-600 flex items-center gap-1"><Clock className="w-3 h-3" /> Due {formatDate(nextDueDate)}</span><span className="text-sm font-semibold text-indigo-600">{formatCurrency(stats.upcoming)}</span></div>}
                   {stats.upcoming === 0 && stats.overdue === 0 && <div className="flex items-center justify-between"><span className="text-xs text-gray-500">Rent</span><span className="text-sm font-semibold text-gray-800">{formatCurrency(t.rent)}</span></div>}
-                  {stats.billsPending > 0 && <div className="flex items-center justify-between"><span className="text-xs text-orange-600 flex items-center gap-1"><Receipt className="w-3 h-3" /> Bills</span><span className="text-sm font-semibold text-orange-600">{formatCurrency(stats.billsPending)}</span></div>}
+                  {stats.billsPending > 0 && <div className="flex items-center justify-between"><span className="text-xs text-orange-600 flex items-center gap-1"><Receipt className="w-3 h-3" /> Bills ({stats.billCount})</span><span className="text-sm font-semibold text-orange-600">{formatCurrency(stats.billsPending)}</span></div>}
                   <div className="flex items-center justify-between pt-1.5 border-t border-gray-200">
                     <span className="text-sm font-bold text-gray-700">{totalOwed > 0 ? 'Total Due' : 'Rent'}</span>
                     <span className={`text-lg font-black ${stats.overdue > 0 ? 'text-red-600' : totalOwed > 0 ? 'text-indigo-600' : 'text-gray-800'}`}>{formatCurrency(totalOwed > 0 ? totalOwed : t.rent)}</span>
                   </div>
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="text-[10px] text-gray-400">{stats.paidCount} of {stats.paymentCount} paid</span>
+                    <span className="text-[10px] text-gray-400">Due {getOrdinal(t.dueDay || 1)} monthly</span>
+                  </div>
                 </div>
 
-                <div className="flex flex-wrap gap-2 mt-3 pt-2">
+                {/* ONE-CLICK RENT PAID / VOID */}
+                <div className="mt-3 pt-2 border-t border-gray-100">
+                  {(() => {
+                    const paidThisCycle = isRentPaidThisCycle(t);
+                    return paidThisCycle ? (
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 flex items-center justify-center gap-2 bg-emerald-600 text-white py-3 rounded-xl font-bold text-sm shadow-sm">
+                          <CheckCircle className="w-4 h-4" /> Rent Paid {formatCurrency(paidThisCycle.amount)}
+                        </div>
+                        <button onClick={() => voidRentPayment(t)} className="flex items-center justify-center gap-1.5 text-xs bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 py-3 px-3 rounded-xl font-bold transition" title="Void this payment (undo)">
+                          <X className="w-4 h-4" /> Void
+                        </button>
+                      </div>
+                    ) : (
+                      <button onClick={() => quickMarkRentPaid(t)} className="w-full flex items-center justify-center gap-2 bg-emerald-600 text-white py-3 rounded-xl font-bold text-sm hover:bg-emerald-700 transition shadow-sm">
+                        <CheckCircle className="w-4 h-4" /> Mark Rent Paid ({formatCurrency(t.rent)})
+                      </button>
+                    );
+                  })()}
+                </div>
+
+                <div className="flex flex-wrap gap-2 mt-2">
                   <button onClick={() => addRentDue(t)} className="flex-1 min-w-[120px] flex items-center justify-center gap-2 text-sm bg-indigo-50 text-indigo-700 hover:bg-indigo-100 py-2.5 px-3 rounded-xl font-bold transition border border-indigo-100">
-                    <Banknote className="w-4 h-4" /> Add Rent
+                    <Banknote className="w-4 h-4" /> Add Rent Due
                   </button>
                   {stats.hasPendingDue && (
                     <button onClick={() => removeRentDue(t.id)} className="flex-1 min-w-[120px] flex items-center justify-center gap-2 text-sm bg-rose-50 text-rose-700 hover:bg-rose-100 py-2.5 px-3 rounded-xl font-bold transition border border-rose-100">
