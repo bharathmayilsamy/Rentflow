@@ -295,7 +295,7 @@ export default function Tenants({ tenants, setTenants, properties, bills, setBil
                       <Phone className="w-3.5 h-3.5 text-gray-400" />
                       <span>{t.phone}</span>
                       <a
-                        href={`https://wa.me/${t.phone.replace(/\D/g, '')}?text=${encodeURIComponent(`Hello ${t.name}, regarding your rent and dues in RentFlow.`)}`}
+                        href={`https://wa.me/${t.phone.replace(/\D/g, '')}?text=${encodeURIComponent(`Hello ${t.name}, regarding your rent and dues..`)}`}
                         target="_blank"
                         rel="noreferrer"
                         className="ml-auto inline-flex items-center justify-center w-8 h-8 rounded-full bg-green-50 text-green-600 hover:bg-green-100 transition"

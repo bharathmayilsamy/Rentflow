@@ -38,7 +38,7 @@ export default function TenantPortal({ tenants, payments, bills, properties, mai
   const generateShareText = (t: Tenant) => {
     const d = getTenantPortalData(t);
     const today = formatDate(new Date().toISOString().split('T')[0]);
-    let msg = `RentFlow - Payment Summary\n`;
+    let msg = `V-DO - Payment Summary\n`;
     msg += `Date: ${today}\n\n`;
     msg += `Dear ${t.name},\n\n`;
     msg += `Property: ${d.prop?.name || '-'}\n`;
@@ -64,7 +64,7 @@ export default function TenantPortal({ tenants, payments, bills, properties, mai
       msg += `\n`;
     }
     msg += `For any maintenance requests or queries, please contact your property manager.\n\n`;
-    msg += `- RentFlow Property Management`;
+    msg += `- V-DO | Property Management, Perfected`;
     return msg;
   };
 
@@ -232,7 +232,7 @@ export default function TenantPortal({ tenants, payments, bills, properties, mai
                   <Copy className="w-5 h-5" /> Copy Summary
                 </button>
                 {selectedTenant.email && (
-                  <a href={`mailto:${selectedTenant.email}?subject=Payment Summary - RentFlow&body=${encodeURIComponent(generateShareText(selectedTenant))}`} className="flex items-center gap-2 bg-blue-50 text-blue-700 border border-blue-200 px-5 py-3 rounded-xl font-bold text-sm hover:bg-blue-100 transition">
+                  <a href={`mailto:${selectedTenant.email}?subject=Payment Summary - V-DO&body=${encodeURIComponent(generateShareText(selectedTenant))}`} className="flex items-center gap-2 bg-blue-50 text-blue-700 border border-blue-200 px-5 py-3 rounded-xl font-bold text-sm hover:bg-blue-100 transition">
                     <Mail className="w-5 h-5" /> Email
                   </a>
                 )}

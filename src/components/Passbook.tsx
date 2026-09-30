@@ -176,17 +176,17 @@ export default function Passbook({ payments, expenses, setExpenses, bills, tenan
     autoTable(doc, { startY: y, head: [['Category', 'Amount', '% of Total']], body: categoryBreakdown.expense.map(([c, a]) => [c, cur(a), totalExpense > 0 ? `${((a / totalExpense) * 100).toFixed(1)}%` : '0%']), ...tblStyle(RED) });
 
     addFooter(doc);
-    doc.save('RentFlow-Passbook.pdf');
+    doc.save('V-DO-Passbook.pdf');
   };
 
   // Export Excel
   const exportExcel = () => {
     const wb = XLSX.utils.book_new();
-    const ws1 = XLSX.utils.aoa_to_sheet([['RentFlow Passbook'], [`Generated: ${formatDate(new Date().toISOString().split('T')[0])}`], [], ['Summary'], ['Total Income', totalIncome], ['Total Expense', totalExpense], ['Net Balance', netBalance], [], ['Monthly P&L'], ['Month', 'Income', 'Expense', 'Profit/Loss'], ...monthlyPL.map(m => [m.month, m.income, m.expense, m.profit])]);
+    const ws1 = XLSX.utils.aoa_to_sheet([['V-DO Passbook'], [`Generated: ${formatDate(new Date().toISOString().split('T')[0])}`], [], ['Summary'], ['Total Income', totalIncome], ['Total Expense', totalExpense], ['Net Balance', netBalance], [], ['Monthly P&L'], ['Month', 'Income', 'Expense', 'Profit/Loss'], ...monthlyPL.map(m => [m.month, m.income, m.expense, m.profit])]);
     XLSX.utils.book_append_sheet(wb, ws1, 'Summary');
     const ws2 = XLSX.utils.aoa_to_sheet([['Transactions'], ['Date', 'Type', 'Category', 'Description', 'Amount', 'Balance', 'Property', 'Tenant', 'Source'], ...filtered.map(e => [e.date, e.type, e.category, e.description, e.type === 'Income' ? e.amount : -e.amount, e.balance, e.property || '', e.tenant || '', e.source])]);
     XLSX.utils.book_append_sheet(wb, ws2, 'Transactions');
-    XLSX.writeFile(wb, 'RentFlow-Passbook.xlsx');
+    XLSX.writeFile(wb, 'V-DO-Passbook.xlsx');
   };
 
   return (

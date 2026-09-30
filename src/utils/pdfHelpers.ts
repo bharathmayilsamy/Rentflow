@@ -15,8 +15,8 @@ export const addHeader = (doc: jsPDF, title: string, subtitle?: string) => {
   const pw = doc.internal.pageSize.getWidth();
   doc.setFillColor(99, 102, 241);
   doc.rect(0, 0, pw, 32, 'F');
-  doc.setFontSize(20); doc.setTextColor(255, 255, 255); doc.text('RentFlow', 14, 18);
-  doc.setFontSize(10); doc.text('Property Management', 14, 26);
+  doc.setFontSize(20); doc.setTextColor(255, 255, 255); doc.text('V-DO', 14, 18);
+  doc.setFontSize(10); doc.text('Property Management, Perfected', 14, 26);
   doc.setFontSize(9); doc.text(formatDate(new Date().toISOString().split('T')[0]), pw - 14, 18, { align: 'right' });
   doc.setFontSize(16); doc.setTextColor(30, 41, 59); doc.text(cl(title), 14, 46);
   if (subtitle) { doc.setFontSize(10); doc.setTextColor(...GRAY); doc.text(cl(subtitle), 14, 54); }
@@ -52,7 +52,7 @@ export const addFooter = (doc: jsPDF) => {
     doc.setDrawColor(226, 232, 240); doc.line(14, ph - 16, pw - 14, ph - 16);
     doc.setFontSize(7); doc.setTextColor(...GRAY);
     doc.text(`Page ${i} of ${pages}`, 14, ph - 10);
-    doc.text('RentFlow - Property Management System', pw - 14, ph - 10, { align: 'right' });
+    doc.text('V-DO - Property Management System', pw - 14, ph - 10, { align: 'right' });
   }
 };
 

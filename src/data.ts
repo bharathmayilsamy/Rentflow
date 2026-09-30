@@ -69,7 +69,7 @@ export const initialSettings: Settings = {
   notifyEmail: true,
   notifyInApp: true,
   profileName: 'Bharath',
-  profileEmail: 'bharath@rentflow.com',
+  profileEmail: 'bharath@v-do.com',
   profilePhone: '9876543200',
   currency: 'INR',
   dateFormat: 'DD/MM/YYYY',
@@ -125,7 +125,7 @@ export const initialPassbook: PassbookEntry[] = [
 
 // Users for user management
 export const initialUsers: User[] = [
-  { id: 'u1', name: 'Bharath', email: 'bharath@rentflow.com', phone: '9876543200', role: 'Owner', avatar: '#6366f1', isActive: true, createdAt: '2024-01-01', lastLogin: '2025-01-15' },
-  { id: 'u2', name: 'Priya Manager', email: 'priya.manager@rentflow.com', phone: '9876543201', role: 'Manager', avatar: '#ec4899', isActive: true, createdAt: '2024-03-15', lastLogin: '2025-01-14' },
-  { id: 'u3', name: 'Ravi Staff', email: 'ravi.staff@rentflow.com', phone: '9876543202', role: 'Staff', avatar: '#22c55e', isActive: true, createdAt: '2024-06-01', lastLogin: '2025-01-13' },
+  { id: 'u1', name: 'Bharath', email: 'bharath@v-do.com', phone: '9876543200', role: 'Owner', avatar: '#6366f1', isActive: true, createdAt: '2024-01-01', lastLogin: '2025-01-15' },
+  { id: 'u2', name: 'Priya Manager', email: 'priya.manager@v-do.com', phone: '9876543201', role: 'Manager', avatar: '#ec4899', isActive: true, createdAt: '2024-03-15', lastLogin: '2025-01-14' },
+  { id: 'u3', name: 'Ravi Staff', email: 'ravi.staff@v-do.com', phone: '9876543202', role: 'Staff', avatar: '#22c55e', isActive: true, createdAt: '2024-06-01', lastLogin: '2025-01-13' },
 ];

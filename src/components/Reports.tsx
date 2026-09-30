@@ -97,7 +97,7 @@ export default function Reports({ expenses, setExpenses, properties, payments, t
     // Header
     doc.setFontSize(20);
     doc.setTextColor(99, 102, 241);
-    doc.text('RentFlow', 14, 20);
+    doc.text('V-DO', 14, 20);
     doc.setFontSize(14);
     doc.setTextColor(0, 0, 0);
     doc.text('Income & Expense Report', 14, 30);
@@ -157,7 +157,7 @@ export default function Reports({ expenses, setExpenses, properties, payments, t
       doc.setPage(i);
       doc.setFontSize(8);
       doc.setTextColor(128, 128, 128);
-      doc.text(`Page ${i} of ${pageCount} | RentFlow - Property Management`, pageWidth / 2, doc.internal.pageSize.getHeight() - 10, { align: 'center' });
+      doc.text(`Page ${i} of ${pageCount} | V-DO - Property Management`, pageWidth / 2, doc.internal.pageSize.getHeight() - 10, { align: 'center' });
     }
     
     doc.save('income-expense-report.pdf');
@@ -169,7 +169,7 @@ export default function Reports({ expenses, setExpenses, properties, payments, t
     
     // Summary sheet
     const summaryData = [
-      ['RentFlow - Income & Expense Report'],
+      ['V-DO - Income & Expense Report'],
       [`Generated on: ${new Date().toLocaleDateString('en-IN')}`],
       [],
       ['Summary'],
@@ -206,7 +206,7 @@ export default function Reports({ expenses, setExpenses, properties, payments, t
     // Header
     doc.setFontSize(20);
     doc.setTextColor(99, 102, 241);
-    doc.text('RentFlow', 14, 20);
+    doc.text('V-DO', 14, 20);
     doc.setFontSize(14);
     doc.setTextColor(0, 0, 0);
     doc.text('Detailed Tenant Payment Report', 14, 30);
@@ -285,7 +285,7 @@ export default function Reports({ expenses, setExpenses, properties, payments, t
       doc.setPage(i);
       doc.setFontSize(8);
       doc.setTextColor(128, 128, 128);
-      doc.text(`Page ${i} of ${pageCount} | RentFlow - Property Management`, pageWidth / 2, doc.internal.pageSize.getHeight() - 10, { align: 'center' });
+      doc.text(`Page ${i} of ${pageCount} | V-DO - Property Management`, pageWidth / 2, doc.internal.pageSize.getHeight() - 10, { align: 'center' });
     }
     
     doc.save('detailed-tenant-report.pdf');
@@ -303,7 +303,7 @@ export default function Reports({ expenses, setExpenses, properties, payments, t
     
     // Summary sheet
     const summaryData = [
-      ['RentFlow - Detailed Tenant Payment Report'],
+      ['V-DO - Detailed Tenant Payment Report'],
       [`Generated on: ${new Date().toLocaleDateString('en-IN')}`],
       [],
       ['Overall Summary'],

@@ -25,7 +25,7 @@ const FILE_TYPES = ['Photo', 'PDF', 'Document', 'Spreadsheet', 'Video', 'Other']
 const FILE_ICONS: Record<string, any> = { Photo: Image, PDF: FileText, Document: FileText, Spreadsheet: FileText, Video: File, Other: File };
 const CAT_COLORS: Record<string, string> = { 'Property Photo': 'bg-blue-100 text-blue-700', Agreement: 'bg-purple-100 text-purple-700', 'ID Proof': 'bg-amber-100 text-amber-700', Receipt: 'bg-green-100 text-green-700', 'Tax Document': 'bg-red-100 text-red-700', Insurance: 'bg-cyan-100 text-cyan-700', 'Maintenance Proof': 'bg-orange-100 text-orange-700', Blueprint: 'bg-indigo-100 text-indigo-700', NOC: 'bg-rose-100 text-rose-700', Other: 'bg-gray-100 text-gray-700' };
 
-const STORAGE_KEY = 'rentflow_documents';
+const STORAGE_KEY = 'v-do_documents';
 
 export default function Documents({ properties, onToast }: Props) {
   const [docs, setDocs] = useState<DocEntry[]>([]);
@@ -84,7 +84,7 @@ export default function Documents({ properties, onToast }: Props) {
           <li>1. Upload your file to <a href="https://drive.google.com" target="_blank" rel="noreferrer" className="underline font-bold">Google Drive</a></li>
           <li>2. Right-click the file → "Get link" → Set to "Anyone with the link"</li>
           <li>3. Copy the link and paste it here</li>
-          <li>4. Your files stay safe on Google Drive - RentFlow just keeps the links organized</li>
+          <li>4. Your files stay safe on Google Drive - V-DO just keeps the links organized</li>
         </ol>
       </div>
 

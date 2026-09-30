@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { AuthUser } from '../types';
 import { signIn, signUp } from '../lib/supabase';
-import { Home, Mail, Lock, Eye, EyeOff, LogIn, UserPlus, ArrowLeft, ShieldCheck } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, LogIn, UserPlus, ArrowLeft, ShieldCheck } from 'lucide-react';
 
 interface Props {
   onLogin: (user: AuthUser) => void;
@@ -81,11 +81,9 @@ export default function Login({ onLogin }: Props) {
 
       <div className="relative w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl shadow-lg shadow-indigo-500/30 mb-4">
-            <Home className="w-8 h-8 text-white" />
-          </div>
-          <h1 className="text-3xl font-bold text-white">RentFlow</h1>
-          <p className="text-slate-400 mt-1">Property Management System</p>
+          <img src="/logo.png" alt="V-DO" className="w-24 h-24 mx-auto mb-4 rounded-2xl shadow-lg" />
+          <h1 className="text-3xl font-bold text-white">V-DO</h1>
+          <p className="text-slate-400 mt-1">Property Management, Perfected</p>
         </div>
 
         <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-white/10">
