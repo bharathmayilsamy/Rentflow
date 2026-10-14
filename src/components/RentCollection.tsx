@@ -3,6 +3,7 @@ import { RentPayment, PaymentMethod, PaymentStatus, Tenant, Property, Expense, T
 import { generateId, generateReceiptNo } from '../data';
 import { formatDate, formatCurrency } from '../utils/helpers';
 import { cur, cl, addHeader, addSection, addSummaryBox, addFooter, tblStyle, GREEN } from '../utils/pdfHelpers';
+import { generateReceipt } from '../utils/receiptGenerator';
 import { Plus, CreditCard, Banknote, Smartphone, Building, FileText, X, CheckCircle, Calendar, TrendingDown, Receipt, Wallet, AlertCircle, FileDown, Trash2, Zap, Droplets, Wifi, Flame, Wrench } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -289,7 +290,10 @@ export default function RentCollection({ payments, setPayments, tenants, propert
                         <td className="px-5 py-3.5"><span className="flex items-center gap-1.5 text-gray-600"><MIcon className="w-4 h-4" /> {p.method}</span></td>
                         <td className="px-5 py-3.5 text-gray-600">{formatDate(p.date)}</td>
                         <td className="px-5 py-3.5 text-gray-500 text-xs font-mono">{p.receiptNo}</td>
-                        <td className="px-5 py-3.5">{tenant && <button onClick={() => exportTenantPDF(tenant)} className="p-1.5 rounded-lg hover:bg-indigo-50 text-indigo-500 transition" title="Export tenant PDF"><FileDown className="w-4 h-4" /></button>}</td>
+                        <td className="px-5 py-3.5 flex gap-1">
+                          {tenant && <button onClick={() => { const prop = properties.find(pr => pr.id === p.propertyId); generateReceipt(p, tenant, prop); onToast('Receipt downloaded'); }} className="p-1.5 rounded-lg hover:bg-green-50 text-green-600 transition" title="Download Receipt"><Receipt className="w-4 h-4" /></button>}
+                          {tenant && <button onClick={() => exportTenantPDF(tenant)} className="p-1.5 rounded-lg hover:bg-indigo-50 text-indigo-500 transition" title="Tenant History"><FileDown className="w-4 h-4" /></button>}
+                        </td>
                       </tr>
                     );
                   })}
