@@ -1,13 +1,15 @@
 import { useState } from 'react';
 import { Settings as SettingsType, LateFeeType, User, UserRole } from '../types';
 import { generateId } from '../data';
-import { Save, Bell, User as UserIcon, Sliders, DollarSign, Users, Plus, Edit2, Trash2, X, Shield, LogOut } from 'lucide-react';
+import { Save, Bell, User as UserIcon, Sliders, DollarSign, Users, Plus, Edit2, Trash2, X, Shield, LogOut, Download, Upload, Database } from 'lucide-react';
 
 interface Props {
   settings: SettingsType;
   setSettings: (s: SettingsType) => void;
   users: User[];
   setUsers: (u: User[]) => void;
+  onBackup?: () => void;
+  onRestore?: (file: File) => void;
   currentUserRole: UserRole;
   onLogout: () => void;
 }
@@ -22,9 +24,9 @@ const ROLE_COLORS: Record<UserRole, string> = {
 
 const AVATAR_COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#f97316', '#eab308', '#22c55e', '#14b8a6', '#06b6d4', '#3b82f6'];
 
-export default function SettingsPage({ settings, setSettings, users, setUsers, currentUserRole, onLogout }: Props) {
+export default function SettingsPage({ settings, setSettings, users, setUsers, currentUserRole, onLogout, onBackup, onRestore }: Props) {
   const [saved, setSaved] = useState(false);
-  const [activeSection, setActiveSection] = useState<'general' | 'users'>('general');
+  const [activeSection, setActiveSection] = useState<'general' | 'users' | 'backup'>('general');
   const [showUserForm, setShowUserForm] = useState(false);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [userForm, setUserForm] = useState({
@@ -115,6 +117,12 @@ export default function SettingsPage({ settings, setSettings, users, setUsers, c
           className={`px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2 ${activeSection === 'users' ? 'bg-indigo-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
         >
           <Users className="w-4 h-4" /> User Management
+        </button>
+        <button
+          onClick={() => setActiveSection('backup')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2 ${activeSection === 'backup' ? 'bg-indigo-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+        >
+          <Database className="w-4 h-4" /> Backup
         </button>
       </div>
 
@@ -410,6 +418,29 @@ export default function SettingsPage({ settings, setSettings, users, setUsers, c
       )}
 
       {/* Add/Edit User Modal */}
+      {activeSection === 'backup' && (
+        <div className="space-y-6 max-w-4xl">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+            <div className="flex items-center gap-3 mb-5">
+              <div className="bg-indigo-100 p-2.5 rounded-lg"><Database className="w-5 h-5 text-indigo-600" /></div>
+              <div><h2 className="text-lg font-semibold text-gray-900">Data Backup & Restore</h2><p className="text-sm text-gray-500">Export or import your complete V-DO data</p></div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <button onClick={() => onBackup?.()} className="flex flex-col items-center gap-3 p-6 border-2 border-dashed border-indigo-200 rounded-xl hover:bg-indigo-50 transition">
+                <Download className="w-8 h-8 text-indigo-600" />
+                <div className="text-center"><p className="font-bold text-gray-900">Export Backup</p><p className="text-xs text-gray-500 mt-1">Download all data as JSON file</p></div>
+              </button>
+              <label className="flex flex-col items-center gap-3 p-6 border-2 border-dashed border-green-200 rounded-xl hover:bg-green-50 transition cursor-pointer">
+                <Upload className="w-8 h-8 text-green-600" />
+                <div className="text-center"><p className="font-bold text-gray-900">Import Backup</p><p className="text-xs text-gray-500 mt-1">Restore data from JSON file</p></div>
+                <input type="file" accept=".json" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) onRestore?.(f); e.target.value = ''; }} />
+              </label>
+            </div>
+            <p className="text-[10px] text-gray-400 mt-4">Backup includes: Properties, Tenants, Payments, Bills, Expenses, Maintenance, Reminders, Users, Settings</p>
+          </div>
+        </div>
+      )}
+
       {showUserForm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowUserForm(false)}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
