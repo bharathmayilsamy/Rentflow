@@ -81,7 +81,7 @@ export default function Login({ onLogin }: Props) {
 
       <div className="relative w-full max-w-md">
         <div className="text-center mb-8">
-          <img src="/logo.png" alt="V-DO" className="w-24 h-24 mx-auto mb-4 rounded-2xl shadow-lg" />
+          <img src="/logo.png" alt="V-DO" className="w-24 h-24 mx-auto mb-4 rounded-2xl shadow-lg" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
           <h1 className="text-3xl font-bold text-white">V-DO</h1>
           <p className="text-slate-400 mt-1">Property Management, Perfected</p>
         </div>

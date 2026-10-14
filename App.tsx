@@ -224,7 +224,7 @@ function App() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-900 to-slate-900 flex items-center justify-center">
         <div className="text-center">
-          <img src="/logo.png" alt="V-DO" className="w-20 h-20 mx-auto mb-4 rounded-2xl shadow-lg" />
+          <img src="/logo.png" alt="V-DO" className="w-20 h-20 mx-auto mb-4 rounded-2xl shadow-lg" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
           <Loader2 className="w-6 h-6 text-indigo-400 animate-spin mx-auto mb-2" />
           <h1 className="text-2xl font-bold text-white">V-DO</h1><p className="text-slate-400 mt-2">Property Management, Perfected</p>
         </div>
@@ -239,7 +239,7 @@ function App() {
       {sidebarOpen && <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />}
       <aside className={`fixed lg:static inset-y-0 left-0 z-50 w-72 bg-gradient-to-b from-slate-900 to-slate-800 transform transition-transform duration-300 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 flex flex-col shadow-2xl`}>
         <div className="h-16 flex items-center gap-3 px-5 border-b border-white/10 shrink-0">
-          <img src="/logo.png" alt="V-DO" className="w-10 h-10 rounded-xl shadow-lg object-cover" />
+          <img src="/logo.png" alt="V-DO" className="w-10 h-10 rounded-xl shadow-lg object-cover" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
           <div><h1 className="text-lg font-bold text-white">V-DO</h1><p className="text-[10px] text-slate-400 -mt-0.5 tracking-wide">Property Management, Perfected</p></div>
           <button onClick={() => setSidebarOpen(false)} className="lg:hidden ml-auto p-1.5 hover:bg-white/10 rounded-lg"><X className="w-5 h-5 text-slate-400" /></button>
         </div>
